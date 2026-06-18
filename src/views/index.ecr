@@ -1,0 +1,402 @@
+<!-- views/index.ecr - Homepage for Sub Zero -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sub Zero - Content Aggregator</title>
+  <style>
+    /* Reset and Base */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #24292e;
+      line-height: 1.6;
+    }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 800px; margin: 0 auto; padding: 0 16px; }
+
+    /* Header - Clean like HN/Dev.to */
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .logo a { color: #24292e; }
+    .logo span { color: #0366d6; }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .nav a { color: #586069; }
+    .nav a:hover { color: #0366d6; text-decoration: none; }
+    .nav a.active { color: #24292e; font-weight: 600; }
+    .btn-primary {
+      background: #0366d6;
+      color: #fff !important;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: #0255b3; text-decoration: none; }
+    .btn-outline {
+      border: 1px solid #e1e4e8;
+      padding: 5px 13px;
+      border-radius: 6px;
+      color: #586069 !important;
+    }
+    .btn-outline:hover { background: #f6f8fa; text-decoration: none; }
+    .mobile-toggle { display: none; background: none; border: none; font-size: 24px; cursor: pointer; }
+
+    /* Feed Selector - Tabs like Dev.to */
+    .feed-selector {
+      display: flex;
+      gap: 4px;
+      padding: 16px 0;
+      border-bottom: 1px solid #e1e4e8;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .feed-btn {
+      background: none;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      color: #586069;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .feed-btn:hover { background: #f1f8ff; color: #0366d6; }
+    .feed-btn.active {
+      background: #0366d6;
+      color: #fff;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 40px 20px 30px;
+      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #e1e4e8;
+    }
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .hero p {
+      color: #586069;
+      font-size: 16px;
+      margin-top: 8px;
+    }
+    .hero .cta-buttons {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .hero .btn-large {
+      padding: 10px 24px;
+      font-size: 16px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .hero .btn-large.primary { background: #0366d6; color: #fff; }
+    .hero .btn-large.primary:hover { background: #0255b3; text-decoration: none; }
+    .hero .btn-large.outline { border: 1px solid #e1e4e8; color: #24292e; }
+    .hero .btn-large.outline:hover { background: #f6f8fa; text-decoration: none; }
+
+    /* Posts - Clean like HN/Reddit */
+    .post {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #e1e4e8;
+      background: #fff;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      transition: background 0.2s;
+    }
+    .post:hover { background: #f6f8fa; }
+    .post-votes {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 40px;
+      padding-top: 2px;
+    }
+    .vote-btn {
+      background: none;
+      border: none;
+      color: #d1d5da;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 8px;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+    .vote-btn:hover { color: #0366d6; }
+    .vote-btn.upvote.active { color: #28a745; }
+    .vote-btn.downvote.active { color: #d73a49; }
+    .vote-score {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+    }
+    .post-content { flex: 1; min-width: 0; }
+    .post-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .post-title a { color: #24292e; }
+    .post-title a:visited { color: #6a737d; }
+    .post-title a:hover { text-decoration: underline; }
+    .post-meta {
+      font-size: 12px;
+      color: #586069;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .post-source {
+      background: #f1f8ff;
+      color: #0366d6;
+      padding: 1px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+    }
+    .post-source.reddit { background: #ffedeb; color: #ff4500; }
+    .post-source.hackernews { background: #f6f6ef; color: #ff6600; }
+    .post-source.devto { background: #f0f0f0; color: #0a0a0a; }
+    .post-source.user { background: #e6f9ed; color: #28a745; }
+    .post-comments { color: #586069; }
+    .post-comments:hover { color: #0366d6; }
+    .save-btn {
+      background: none;
+      border: 1px solid #e1e4e8;
+      padding: 1px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #586069;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .save-btn:hover { background: #f1f8ff; border-color: #0366d6; }
+
+    /* Loading & Empty */
+    .loading, .empty-state {
+      text-align: center;
+      padding: 40px 0;
+      color: #586069;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: 24px;
+    }
+    .footer p { margin: 4px 0; }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .nav { display: none; }
+      .mobile-toggle { display: block; }
+      .nav.open { display: flex; flex-direction: column; width: 100%; padding: 12px 0; }
+      .post { flex-wrap: wrap; }
+      .post-votes { flex-direction: row; width: 100%; justify-content: flex-start; gap: 4px; }
+      .feed-selector { gap: 4px; }
+      .feed-btn { font-size: 12px; padding: 4px 12px; }
+      .hero h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <div class="logo">
+        <a href="/">❄️ Sub Zero</a>
+      </div>
+      <nav class="nav" id="mainNav">
+        <a href="/" class="active">Home</a>
+        <a href="/feed/hot">Hot</a>
+        <a href="/feed/new">New</a>
+        <a href="/feed/top">Top</a>
+        <a href="/search">Search</a>
+        <% if logged_in? %>
+          <a href="/settings">Settings</a>
+          <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
+        <% else %>
+          <a href="/login">Login</a>
+          <a href="/signup" class="btn-primary">Sign Up</a>
+        <% end %>
+      </nav>
+      <button class="mobile-toggle" onclick="document.getElementById('mainNav').classList.toggle('open')">☰</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero Section -->
+    <section class="hero">
+      <h1>❄️ Sub Zero</h1>
+      <p>Curated content from Reddit, Hacker News & Dev.to — all in one place.</p>
+      <div class="cta-buttons">
+        <% if logged_in? %>
+          <a href="/settings" class="btn-large primary">Your Feed</a>
+        <% else %>
+          <a href="/signup" class="btn-large primary">Get Started</a>
+          <a href="/login" class="btn-large outline">Log In</a>
+        <% end %>
+      </div>
+    </section>
+
+    <div class="feed-selector" id="feedSelector">
+      <button class="feed-btn active" data-feed="mixed">Mixed</button>
+      <button class="feed-btn" data-feed="hot">Hot</button>
+      <button class="feed-btn" data-feed="new">New</button>
+      <button class="feed-btn" data-feed="top">Top</button>
+      <% if logged_in? %>
+        <button class="feed-btn" data-feed="personalized">For You</button>
+        <button class="feed-btn" data-feed="trending">Trending</button>
+      <% end %>
+    </div>
+
+    <div id="feed">
+      <div class="loading">Loading posts...</div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>❄️ Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
+      <p>Built with Crystal & Kemal</p>
+    </div>
+  </footer>
+
+  <script>
+    let currentFeed = 'mixed';
+    let currentUser = <%= logged_in? ? "true" : "false" %>;
+
+    function getPosts(feed) {
+      const feedEl = document.getElementById('feed');
+      feedEl.innerHTML = '<div class="loading">Loading...</div>';
+
+      fetch(`/api/feed?feed=${feed}&limit=50`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.results && data.results.length > 0) {
+            feedEl.innerHTML = data.results.map(post => renderPost(post)).join('');
+          } else {
+            feedEl.innerHTML = '<div class="empty-state">No posts found</div>';
+          }
+        })
+        .catch(() => {
+          feedEl.innerHTML = '<div class="empty-state">Error loading posts</div>';
+        });
+    }
+
+    function renderPost(post) {
+      const sourceClass = post.source || 'user';
+      const isSaved = post.saved ? 'Saved' : 'Save';
+      const upvoteActive = post.user_vote === 1 ? 'active' : '';
+      const downvoteActive = post.user_vote === -1 ? 'active' : '';
+
+      return `
+        <article class="post" data-id="${post.id}">
+          <div class="post-votes">
+            <button class="vote-btn upvote ${upvoteActive}" onclick="vote(${post.id}, 1)">▲</button>
+            <span class="vote-score">${post.score || 0}</span>
+            <button class="vote-btn downvote ${downvoteActive}" onclick="vote(${post.id}, -1)">▼</button>
+          </div>
+          <div class="post-content">
+            <h2 class="post-title">
+              <a href="${post.url || '#'}" target="_blank">${post.title}</a>
+            </h2>
+            <div class="post-meta">
+              <span class="post-source ${sourceClass}">${sourceClass}</span>
+              <span>${timeAgo(post.created_at)}</span>
+              <a href="/post/${post.id}" class="post-comments">${post.comment_count || 0} comments</a>
+              ${currentUser ? `<button class="save-btn" onclick="savePost(${post.id})">${isSaved}</button>` : ''}
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function timeAgo(date) {
+      if (!date) return 'recently';
+      const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+      if (seconds < 60) return 'just now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return minutes + 'm ago';
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return hours + 'h ago';
+      const days = Math.floor(hours / 24);
+      return days + 'd ago';
+    }
+
+    function vote(postId, direction) {
+      if (!currentUser) {
+        alert('Please login to vote');
+        return;
+      }
+      const endpoint = direction === 1 ? `/api/posts/${postId}/upvote` : `/api/posts/${postId}/downvote`;
+      fetch(endpoint, { method: 'POST' })
+        .then(() => getPosts(currentFeed));
+    }
+
+    function savePost(postId) {
+      if (!currentUser) {
+        alert('Please login to save posts');
+        return;
+      }
+      fetch(`/api/posts/${postId}/save`, { method: 'POST' })
+        .then(() => getPosts(currentFeed));
+    }
+
+    document.getElementById('feedSelector').addEventListener('click', function(e) {
+      const btn = e.target.closest('.feed-btn');
+      if (!btn) return;
+
+      document.querySelectorAll('.feed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFeed = btn.dataset.feed;
+      getPosts(currentFeed);
+    });
+
+    getPosts('mixed');
+  </script>
+</body>
+</html>
