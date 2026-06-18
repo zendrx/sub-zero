@@ -1,0 +1,410 @@
+<!-- views/search.ecr - Search page for Sub Zero -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search - Sub Zero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #24292e;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 800px; margin: 0 auto; padding: 0 16px; width: 100%; }
+
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 0;
+    }
+    .header-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .logo a { color: #24292e; }
+    .logo a:hover { text-decoration: none; }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .nav a { color: #586069; }
+    .nav a:hover { color: #0366d6; text-decoration: none; }
+    .nav a.active { color: #24292e; font-weight: 600; }
+    .btn-primary {
+      background: #0366d6;
+      color: #fff !important;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: #0255b3; text-decoration: none; }
+
+    .search-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      padding: 24px;
+      margin-top: 24px;
+    }
+    .search-card h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .search-card .subtitle {
+      color: #586069;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .search-form {
+      display: flex;
+      gap: 8px;
+    }
+    .search-form input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    .search-form input:focus {
+      outline: none;
+      border-color: #0366d6;
+      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+    }
+    .search-form button {
+      padding: 10px 24px;
+      background: #0366d6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .search-form button:hover { background: #0255b3; }
+    .search-form button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .search-filters {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .search-filters select {
+      padding: 6px 12px;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+    }
+    .search-filters select:focus { outline: none; border-color: #0366d6; }
+
+    .results-stats {
+      font-size: 14px;
+      color: #586069;
+      margin: 16px 0 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e1e4e8;
+    }
+
+    .result-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #e1e4e8;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item .title {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    .result-item .title a { color: #24292e; }
+    .result-item .title a:visited { color: #6a737d; }
+    .result-item .title a:hover { text-decoration: underline; }
+    .result-item .meta {
+      font-size: 13px;
+      color: #586069;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 4px;
+      align-items: center;
+    }
+    .result-item .source {
+      background: #f1f8ff;
+      color: #0366d6;
+      padding: 1px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+    }
+    .result-item .source.reddit { background: #ffedeb; color: #ff4500; }
+    .result-item .source.hackernews { background: #f6f6ef; color: #ff6600; }
+    .result-item .source.devto { background: #f0f0f0; color: #0a0a0a; }
+    .result-item .source.user { background: #e6f9ed; color: #28a745; }
+    .result-item .score { font-weight: 500; }
+
+    .result-item .snippet {
+      font-size: 14px;
+      color: #586069;
+      margin-top: 4px;
+    }
+    .result-item .highlight {
+      background: #ffffcc;
+      padding: 0 2px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 0;
+      color: #586069;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+    .loading {
+      text-align: center;
+      padding: 40px 0;
+      color: #586069;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: auto;
+    }
+    .footer p { margin: 4px 0; }
+
+    @media (max-width: 600px) {
+      .search-card { padding: 16px; }
+      .search-form { flex-direction: column; }
+      .search-form button { width: 100%; }
+      .search-filters { flex-direction: column; }
+      .search-filters select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="/">Sub Zero</a>
+      </div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/search" class="active">Search</a>
+        <% if logged_in? %>
+          <a href="/settings">Settings</a>
+          <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
+        <% else %>
+          <a href="/login">Login</a>
+          <a href="/signup" class="btn-primary">Sign Up</a>
+        <% end %>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="search-card" x-data="searchPage()" x-init="init()">
+      <h1>Search</h1>
+      <p class="subtitle">Find posts, comments, and users across all sources.</p>
+
+      <form class="search-form" @submit.prevent="search">
+        <input type="text" x-model="query" placeholder="Search for posts, topics, or users..." required>
+        <button type="submit" :disabled="loading || !query.trim()">
+          <span x-show="!loading">Search</span>
+          <span x-show="loading">Searching...</span>
+        </button>
+      </form>
+
+      <div class="search-filters">
+        <select x-model="type">
+          <option value="all">All</option>
+          <option value="posts">Posts</option>
+          <option value="comments">Comments</option>
+          <% if logged_in? %>
+            <option value="users">Users</option>
+          <% end %>
+        </select>
+        <select x-model="source">
+          <option value="all">All Sources</option>
+          <option value="reddit">Reddit</option>
+          <option value="hackernews">Hacker News</option>
+          <option value="devto">Dev.to</option>
+          <option value="user">User Posts</option>
+        </select>
+        <select x-model="sort">
+          <option value="relevance">Relevance</option>
+          <option value="newest">Newest</option>
+          <option value="top">Top</option>
+        </select>
+      </div>
+
+      <!-- Results -->
+      <div x-show="hasSearched && !loading">
+        <div class="results-stats" x-show="results.total > 0">
+          Found <strong x-text="results.total"></strong> results in <strong x-text="results.time || '0'"></strong>s
+        </div>
+
+        <template x-for="item in results.items" :key="item.id">
+          <div class="result-item">
+            <div class="title">
+              <a :href="item.url || '/post/' + item.id" target="_blank" x-html="highlight(item.title)"></a>
+            </div>
+            <div class="snippet" x-html="highlight(item.snippet || '')"></div>
+            <div class="meta">
+              <span class="source" :class="item.source" x-text="item.source"></span>
+              <span class="score" x-show="item.score !== undefined">▲ <span x-text="item.score || 0"></span></span>
+              <span x-text="item.comment_count !== undefined ? item.comment_count + ' comments' : ''"></span>
+              <span x-text="timeAgo(item.created_at)"></span>
+              <span x-show="item.username">by <strong x-text="item.username"></strong></span>
+            </div>
+          </div>
+        </template>
+
+        <div class="empty-state" x-show="results.items && results.items.length === 0">
+          <p>No results found for "<strong x-text="query"></strong>"</p>
+          <p style="font-size:13px;margin-top:4px;">Try different keywords or filters.</p>
+        </div>
+      </div>
+
+      <div class="empty-state" x-show="!hasSearched && !loading">
+        <p>Enter a search query above to find content.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/alpinejs@3.13.3" defer></script>
+  <script>
+    function searchPage() {
+      return {
+        query: '',
+        type: 'all',
+        source: 'all',
+        sort: 'relevance',
+        loading: false,
+        hasSearched: false,
+        results: { items: [], total: 0, time: 0 },
+
+        init() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const q = urlParams.get('q');
+          if (q) {
+            this.query = q;
+            this.search();
+          }
+        },
+
+        search() {
+          if (!this.query.trim()) return;
+
+          this.loading = true;
+          this.hasSearched = true;
+          const start = performance.now();
+
+          let endpoint = '/api/search/posts';
+          if (this.type === 'comments') {
+            endpoint = '/api/search/comments';
+          } else if (this.type === 'users' && <%= logged_in? ? "true" : "false" %>) {
+            endpoint = '/api/search/users';
+          } else if (this.type === 'all') {
+            endpoint = '/api/search/all';
+          }
+
+          // Build query params
+          const params = new URLSearchParams();
+          params.append('q', this.query);
+          if (this.source !== 'all') {
+            if (endpoint === '/api/search/posts') {
+              // For source filter, use the source endpoint
+              endpoint = `/api/search/source/${this.source}`;
+            } else {
+              params.append('source', this.source);
+            }
+          }
+          params.append('limit', '50');
+
+          fetch(`${endpoint}?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+              this.loading = false;
+              const end = performance.now();
+              this.results.time = ((end - start) / 1000).toFixed(2);
+
+              if (data.status === 'success') {
+                let items = [];
+                if (data.results) {
+                  items = data.results;
+                } else if (data.posts) {
+                  // For /api/search/all
+                  items = [...data.posts, ...data.comments];
+                  // Add user results if logged in
+                  if (data.users) {
+                    items = [...items, ...data.users];
+                  }
+                }
+                this.results.items = items;
+                this.results.total = items.length;
+              } else {
+                this.results.items = [];
+                this.results.total = 0;
+              }
+            })
+            .catch(() => {
+              this.loading = false;
+              this.results.items = [];
+              this.results.total = 0;
+            });
+        },
+
+        highlight(text) {
+          if (!text || !this.query.trim()) return text;
+          const q = this.query.trim();
+          const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+          return text.replace(regex, '<span class="highlight">$1</span>');
+        },
+
+        timeAgo(date) {
+          if (!date) return 'recently';
+          const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+          if (seconds < 60) return 'just now';
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return minutes + 'm ago';
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return hours + 'h ago';
+          const days = Math.floor(hours / 24);
+          return days + 'd ago';
+        }
+      };
+    }
+  </script>
+</body>
+</html>
