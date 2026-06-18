@@ -1,0 +1,471 @@
+<!-- views/feed.ecr - Dedicated feed page for Sub Zero -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sub Zero - Feed</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #24292e;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 800px; margin: 0 auto; padding: 0 16px; width: 100%; }
+
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 0;
+    }
+    .header-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .logo a { color: #24292e; }
+    .logo a:hover { text-decoration: none; }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .nav a { color: #586069; }
+    .nav a:hover { color: #0366d6; text-decoration: none; }
+    .nav a.active { color: #24292e; font-weight: 600; }
+    .btn-primary {
+      background: #0366d6;
+      color: #fff !important;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: #0255b3; text-decoration: none; }
+
+    .feed-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .feed-header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .feed-header .feed-meta {
+      font-size: 13px;
+      color: #586069;
+    }
+
+    .feed-selector {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      padding: 6px;
+      margin-bottom: 16px;
+    }
+    .feed-btn {
+      background: none;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #586069;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .feed-btn:hover { background: #f1f8ff; color: #0366d6; }
+    .feed-btn.active {
+      background: #0366d6;
+      color: #fff;
+    }
+
+    .post {
+      display: flex;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s;
+    }
+    .post:hover { border-color: #d1d5da; }
+
+    .post-votes {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 36px;
+      padding-top: 2px;
+    }
+    .vote-btn {
+      background: none;
+      border: none;
+      color: #d1d5da;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+    .vote-btn:hover { color: #0366d6; }
+    .vote-btn.upvote.active { color: #28a745; }
+    .vote-btn.downvote.active { color: #d73a49; }
+    .vote-score {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+    }
+
+    .post-content { flex: 1; min-width: 0; }
+    .post-title {
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .post-title a { color: #24292e; }
+    .post-title a:visited { color: #6a737d; }
+    .post-title a:hover { text-decoration: underline; }
+
+    .post-meta {
+      font-size: 12px;
+      color: #586069;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .post-source {
+      background: #f1f8ff;
+      color: #0366d6;
+      padding: 1px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+    }
+    .post-source.reddit { background: #ffedeb; color: #ff4500; }
+    .post-source.hackernews { background: #f6f6ef; color: #ff6600; }
+    .post-source.devto { background: #f0f0f0; color: #0a0a0a; }
+    .post-source.user { background: #e6f9ed; color: #28a745; }
+    .post-comments { color: #586069; }
+    .post-comments:hover { color: #0366d6; }
+    .save-btn {
+      background: none;
+      border: 1px solid #e1e4e8;
+      padding: 1px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #586069;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .save-btn:hover { background: #f1f8ff; border-color: #0366d6; }
+
+    .loading, .empty-state {
+      text-align: center;
+      padding: 40px 0;
+      color: #586069;
+    }
+
+    .load-more {
+      text-align: center;
+      padding: 16px 0 32px;
+    }
+    .load-more button {
+      padding: 8px 32px;
+      background: none;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #586069;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .load-more button:hover { background: #f6f8fa; border-color: #0366d6; color: #0366d6; }
+    .load-more button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: auto;
+    }
+    .footer p { margin: 4px 0; }
+
+    @media (max-width: 600px) {
+      .post { flex-wrap: wrap; padding: 10px 12px; }
+      .post-votes { flex-direction: row; width: 100%; justify-content: flex-start; gap: 4px; }
+      .feed-selector { gap: 4px; }
+      .feed-btn { font-size: 12px; padding: 4px 12px; }
+      .feed-header h1 { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="/">Sub Zero</a>
+      </div>
+      <nav class="nav">
+        <a href="/" class="active">Home</a>
+        <a href="/search">Search</a>
+        <% if logged_in? %>
+          <a href="/settings">Settings</a>
+          <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
+        <% else %>
+          <a href="/login">Login</a>
+          <a href="/signup" class="btn-primary">Sign Up</a>
+        <% end %>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" x-data="feedPage()" x-init="init()">
+    <div class="feed-header">
+      <h1 x-text="feedTitle"></h1>
+      <span class="feed-meta" x-text="totalPosts + ' posts'"></span>
+    </div>
+
+    <div class="feed-selector">
+      <button class="feed-btn" :class="{ active: currentFeed === 'mixed' }" @click="changeFeed('mixed')">Mixed</button>
+      <button class="feed-btn" :class="{ active: currentFeed === 'hot' }" @click="changeFeed('hot')">Hot</button>
+      <button class="feed-btn" :class="{ active: currentFeed === 'new' }" @click="changeFeed('new')">New</button>
+      <button class="feed-btn" :class="{ active: currentFeed === 'top' }" @click="changeFeed('top')">Top</button>
+      <% if logged_in? %>
+        <button class="feed-btn" :class="{ active: currentFeed === 'personalized' }" @click="changeFeed('personalized')">For You</button>
+        <button class="feed-btn" :class="{ active: currentFeed === 'trending' }" @click="changeFeed('trending')">Trending</button>
+      <% end %>
+    </div>
+
+    <div id="feed">
+      <div x-show="loading" class="loading">Loading posts...</div>
+
+      <template x-for="post in posts" :key="post.id">
+        <article class="post">
+          <div class="post-votes">
+            <button class="vote-btn upvote" :class="{ active: post.user_vote === 1 }" @click="vote(post.id, 1)">▲</button>
+            <span class="vote-score" x-text="post.score || 0"></span>
+            <button class="vote-btn downvote" :class="{ active: post.user_vote === -1 }" @click="vote(post.id, -1)">▼</button>
+          </div>
+          <div class="post-content">
+            <div class="post-title">
+              <a :href="post.url || '#'" target="_blank" x-text="post.title"></a>
+            </div>
+            <div class="post-meta">
+              <span class="post-source" :class="post.source" x-text="post.source"></span>
+              <span x-text="timeAgo(post.created_at)"></span>
+              <a :href="'/post/' + post.id" class="post-comments" x-text="post.comment_count + ' comments'"></a>
+              <% if logged_in? %>
+                <button class="save-btn" @click="savePost(post.id)" x-text="post.saved ? 'Unsave' : 'Save'"></button>
+              <% end %>
+            </div>
+          </div>
+        </article>
+      </template>
+
+      <div x-show="!loading && posts.length === 0" class="empty-state">
+        No posts found in this feed.
+      </div>
+
+      <div class="load-more" x-show="posts.length > 0 && hasMore">
+        <button @click="loadMore" :disabled="loadingMore">
+          <span x-show="!loadingMore">Load more</span>
+          <span x-show="loadingMore">Loading...</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/alpinejs@3.13.3" defer></script>
+  <script>
+    function feedPage() {
+      return {
+        currentFeed: 'mixed',
+        posts: [],
+        offset: 0,
+        limit: 25,
+        totalPosts: 0,
+        loading: true,
+        loadingMore: false,
+        hasMore: true,
+        currentUser: <%= logged_in? ? "true" : "false" %>,
+
+        init() {
+          // Get feed from URL path
+          const path = window.location.pathname;
+          if (path.includes('/hot')) this.currentFeed = 'hot';
+          else if (path.includes('/new')) this.currentFeed = 'new';
+          else if (path.includes('/top')) this.currentFeed = 'top';
+          else if (path.includes('/personalized')) this.currentFeed = 'personalized';
+          else if (path.includes('/trending')) this.currentFeed = 'trending';
+          else if (path.includes('/mixed')) this.currentFeed = 'mixed';
+
+          this.loadFeed();
+        },
+
+        get feedTitle() {
+          const titles = {
+            'mixed': 'Mixed Feed',
+            'hot': 'Hot Feed',
+            'new': 'New Feed',
+            'top': 'Top Feed',
+            'personalized': 'For You',
+            'trending': 'Trending'
+          };
+          return titles[this.currentFeed] || 'Feed';
+        },
+
+        changeFeed(feed) {
+          if (feed === this.currentFeed) return;
+          // Update URL without page reload
+          const url = `/feed/${feed}`;
+          window.history.pushState({ feed }, '', url);
+          this.currentFeed = feed;
+          this.offset = 0;
+          this.posts = [];
+          this.hasMore = true;
+          this.loadFeed();
+        },
+
+        loadFeed() {
+          this.loading = true;
+          this.offset = 0;
+
+          fetch(`/api/feed?feed=${this.currentFeed}&limit=${this.limit}&offset=0`)
+            .then(res => res.json())
+            .then(data => {
+              this.loading = false;
+              if (data.status === 'success') {
+                this.posts = data.results || [];
+                this.totalPosts = data.pagination?.count || this.posts.length;
+                this.hasMore = (data.results || []).length >= this.limit;
+                this.offset = this.limit;
+              } else {
+                this.posts = [];
+                this.hasMore = false;
+              }
+            })
+            .catch(() => {
+              this.loading = false;
+              this.posts = [];
+              this.hasMore = false;
+            });
+        },
+
+        loadMore() {
+          if (this.loadingMore || !this.hasMore) return;
+
+          this.loadingMore = true;
+
+          fetch(`/api/feed?feed=${this.currentFeed}&limit=${this.limit}&offset=${this.offset}`)
+            .then(res => res.json())
+            .then(data => {
+              this.loadingMore = false;
+              if (data.status === 'success') {
+                const newPosts = data.results || [];
+                this.posts = [...this.posts, ...newPosts];
+                this.hasMore = newPosts.length >= this.limit;
+                this.offset += this.limit;
+              } else {
+                this.hasMore = false;
+              }
+            })
+            .catch(() => {
+              this.loadingMore = false;
+              this.hasMore = false;
+            });
+        },
+
+        vote(postId, direction) {
+          if (!this.currentUser) { alert('Please login to vote'); return; }
+          const endpoint = direction === 1 ? `/api/posts/${postId}/upvote` : `/api/posts/${postId}/downvote`;
+          fetch(endpoint, { method: 'POST' })
+            .then(res => res.json())
+            .then(() => {
+              // Update post in list
+              const post = this.posts.find(p => p.id === postId);
+              if (post) {
+                if (post.user_vote === direction) {
+                  post.user_vote = 0;
+                  post.score -= direction;
+                } else {
+                  if (post.user_vote) post.score -= post.user_vote;
+                  post.user_vote = direction;
+                  post.score += direction;
+                }
+              }
+            });
+        },
+
+        savePost(postId) {
+          if (!this.currentUser) { alert('Please login to save'); return; }
+          const post = this.posts.find(p => p.id === postId);
+          if (!post) return;
+          const method = post.saved ? 'DELETE' : 'POST';
+          fetch(`/api/posts/${postId}/save`, { method })
+            .then(res => res.json())
+            .then(() => { post.saved = !post.saved; });
+        },
+
+        timeAgo(date) {
+          if (!date) return 'recently';
+          const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+          if (seconds < 60) return 'just now';
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return minutes + 'm ago';
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return hours + 'h ago';
+          const days = Math.floor(hours / 24);
+          return days + 'd ago';
+        }
+      };
+    }
+
+    // Handle browser back/forward
+    window.addEventListener('popstate', function(e) {
+      if (e.state && e.state.feed) {
+        const feed = e.state.feed;
+        // Update active feed without full page reload
+        const app = document.querySelector('[x-data="feedPage()"]')?._x_dataStack?.[0];
+        if (app) {
+          app.currentFeed = feed;
+          app.offset = 0;
+          app.posts = [];
+          app.hasMore = true;
+          app.loadFeed();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
