@@ -1,0 +1,414 @@
+<!-- views/signup.ecr - Sign Up page for Sub Zero -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up - Sub Zero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #24292e;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 480px; margin: 0 auto; padding: 0 16px; width: 100%; }
+
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 0;
+    }
+    .header-inner {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .logo a { color: #24292e; }
+    .logo a:hover { text-decoration: none; }
+    .logo span { color: #0366d6; }
+
+    .signup-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      padding: 32px 24px;
+      margin-top: 40px;
+      margin-bottom: 40px;
+    }
+    .signup-card h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .signup-card .subtitle {
+      color: #586069;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #24292e;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      background: #fff;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0366d6;
+      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+    }
+    .form-group input.error {
+      border-color: #d73a49;
+    }
+    .form-group .error-text {
+      color: #d73a49;
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+    .form-group .error-text.show { display: block; }
+    .form-group .hint {
+      color: #586069;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 10px;
+      background: #0366d6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover { background: #0255b3; }
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: #586069;
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e1e4e8;
+    }
+    .login-link {
+      text-align: center;
+      font-size: 14px;
+      color: #586069;
+      margin-top: 16px;
+    }
+    .login-link a { color: #0366d6; font-weight: 500; }
+    .login-link a:hover { text-decoration: underline; }
+
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: auto;
+    }
+    .footer p { margin: 4px 0; }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .alert-error {
+      background: #ffeef0;
+      border: 1px solid #f97583;
+      color: #d73a49;
+    }
+    .alert-success {
+      background: #e6ffed;
+      border: 1px solid #85e89d;
+      color: #28a745;
+    }
+    .alert-info {
+      background: #f1f8ff;
+      border: 1px solid #79b8ff;
+      color: #0366d6;
+    }
+
+    .password-strength {
+      height: 4px;
+      background: #e1e4e8;
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .password-strength .bar {
+      height: 100%;
+      width: 0;
+      transition: width 0.3s, background 0.3s;
+      border-radius: 2px;
+    }
+    .password-strength .bar.weak { width: 25%; background: #d73a49; }
+    .password-strength .bar.medium { width: 50%; background: #fb8532; }
+    .password-strength .bar.strong { width: 75%; background: #0366d6; }
+    .password-strength .bar.very-strong { width: 100%; background: #28a745; }
+
+    .terms {
+      font-size: 12px;
+      color: #586069;
+      margin-top: 12px;
+      text-align: center;
+    }
+    .terms a { color: #0366d6; }
+
+    @media (max-width: 600px) {
+      .signup-card { padding: 24px 16px; margin-top: 20px; }
+      .signup-card h1 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="/">Sub Zero</a>
+      </div>
+      <a href="/login" style="font-size:14px;">Log In</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="signup-card">
+      <h1>Create your account</h1>
+      <p class="subtitle">Join the community and start curating your feed.</p>
+
+      <% if flash["error"] %>
+        <div class="alert alert-error"><%= flash["error"] %></div>
+      <% end %>
+      <% if flash["success"] %>
+        <div class="alert alert-success"><%= flash["success"] %></div>
+      <% end %>
+
+      <form action="/signup" method="POST" id="signupForm" x-data="signupForm()" @submit.prevent="submit">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" 
+                 x-model="username" 
+                 :class="{ error: errors.username }"
+                 required minlength="3" maxlength="30"
+                 placeholder="Choose a username">
+          <div class="error-text" :class="{ show: errors.username }" x-text="errors.username"></div>
+          <div class="hint">3-30 characters, letters and numbers only.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" 
+                 x-model="email"
+                 :class="{ error: errors.email }"
+                 required
+                 placeholder="Enter your email">
+          <div class="error-text" :class="{ show: errors.email }" x-text="errors.email"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" 
+                 x-model="password"
+                 @input="checkStrength"
+                 :class="{ error: errors.password }"
+                 required minlength="6"
+                 placeholder="Create a password">
+          <div class="password-strength">
+            <div class="bar" :class="strengthClass" :style="{ width: strengthPercent }"></div>
+          </div>
+          <div class="error-text" :class="{ show: errors.password }" x-text="errors.password"></div>
+          <div class="hint">At least 6 characters.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirm_password">Confirm Password</label>
+          <input type="password" id="confirm_password" name="confirm_password" 
+                 x-model="confirmPassword"
+                 :class="{ error: errors.confirmPassword }"
+                 required
+                 placeholder="Confirm your password">
+          <div class="error-text" :class="{ show: errors.confirmPassword }" x-text="errors.confirmPassword"></div>
+        </div>
+
+        <button type="submit" class="btn-submit" :disabled="loading">
+          <span x-show="!loading">Create Account</span>
+          <span x-show="loading">Creating account...</span>
+        </button>
+
+        <div class="terms">
+          By signing up, you agree to our 
+          <a href="/terms">Terms of Service</a> and 
+          <a href="/privacy">Privacy Policy</a>.
+        </div>
+      </form>
+
+      <div class="login-link">
+        Already have an account? <a href="/login">Log In</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/alpinejs@3.13.3" defer></script>
+  <script>
+    function signupForm() {
+      return {
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        loading: false,
+        strengthClass: '',
+        strengthPercent: '0%',
+        errors: {
+          username: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        },
+        checkStrength() {
+          const pwd = this.password;
+          let strength = 0;
+          if (pwd.length >= 6) strength++;
+          if (pwd.match(/[a-z]/)) strength++;
+          if (pwd.match(/[A-Z]/)) strength++;
+          if (pwd.match(/[0-9]/)) strength++;
+          if (pwd.match(/[^a-zA-Z0-9]/)) strength++;
+
+          const map = ['', 'weak', 'medium', 'strong', 'very-strong'];
+          const percents = ['0%', '25%', '50%', '75%', '100%'];
+          this.strengthClass = map[strength] || '';
+          this.strengthPercent = percents[strength] || '0%';
+        },
+        validate() {
+          let valid = true;
+          this.errors = { username: '', email: '', password: '', confirmPassword: '' };
+
+          if (!this.username || this.username.length < 3) {
+            this.errors.username = 'Username must be at least 3 characters';
+            valid = false;
+          } else if (this.username.length > 30) {
+            this.errors.username = 'Username must be less than 30 characters';
+            valid = false;
+          } else if (!/^[a-zA-Z0-9_]+$/.test(this.username)) {
+            this.errors.username = 'Username can only contain letters, numbers, and underscores';
+            valid = false;
+          }
+
+          if (!this.email || !this.email.includes('@')) {
+            this.errors.email = 'Please enter a valid email address';
+            valid = false;
+          }
+
+          if (!this.password || this.password.length < 6) {
+            this.errors.password = 'Password must be at least 6 characters';
+            valid = false;
+          }
+
+          if (this.password !== this.confirmPassword) {
+            this.errors.confirmPassword = 'Passwords do not match';
+            valid = false;
+          }
+
+          return valid;
+        },
+        submit() {
+          if (!this.validate()) return;
+
+          this.loading = true;
+
+          fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: this.username,
+              email: this.email,
+              password: this.password
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.loading = false;
+            if (data.status === 'success') {
+              // Redirect to login with success message
+              window.location.href = '/login?registered=true';
+            } else {
+              // Show error
+              const errorMsg = data.message || 'Registration failed';
+              if (errorMsg.includes('username')) {
+                this.errors.username = errorMsg;
+              } else if (errorMsg.includes('email')) {
+                this.errors.email = errorMsg;
+              } else {
+                // Show general error
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-error';
+                alert.textContent = errorMsg;
+                const form = document.getElementById('signupForm');
+                form.prepend(alert);
+                setTimeout(() => alert.remove(), 5000);
+              }
+            }
+          })
+          .catch(() => {
+            this.loading = false;
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-error';
+            alert.textContent = 'Something went wrong. Please try again.';
+            const form = document.getElementById('signupForm');
+            form.prepend(alert);
+            setTimeout(() => alert.remove(), 5000);
+          });
+        }
+      };
+    }
+  </script>
+</body>
+</html>
