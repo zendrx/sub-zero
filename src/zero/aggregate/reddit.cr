@@ -298,28 +298,3 @@ module RedditFetcher
     user_agents.sample
   end
 end
-
-# Scheduler for automatic fetching
-# In your main app, you'd run this in a fiber
-def start_reddit_scheduler
-  spawn do
-    loop do
-      begin
-        puts "Starting scheduled Reddit fetch..."
-        saved = RedditFetcher.full_fetch
-        
-        # Prune old posts after fetching
-        if saved > 0
-          pruned = PostDB.prune_old_posts(10000)
-          puts "Pruned #{pruned} old posts" if pruned > 0
-        end
-        
-        puts "Scheduled fetch complete. Next fetch in 5 minutes."
-        sleep 5.minutes
-      rescue e : Exception
-        puts "Scheduler error: #{e.message}"
-        sleep 5.minutes
-      end
-    end
-  end
-end
