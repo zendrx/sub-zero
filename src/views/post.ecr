@@ -1,0 +1,603 @@
+<!-- views/post.ecr - Single post page for Sub Zero -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sub Zero - Post</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #24292e;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 800px; margin: 0 auto; padding: 0 16px; width: 100%; }
+
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 0;
+    }
+    .header-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .logo a { color: #24292e; }
+    .logo a:hover { text-decoration: none; }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .nav a { color: #586069; }
+    .nav a:hover { color: #0366d6; text-decoration: none; }
+    .btn-primary {
+      background: #0366d6;
+      color: #fff !important;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: #0255b3; text-decoration: none; }
+
+    .post-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      padding: 24px 24px 16px;
+      margin-top: 24px;
+    }
+    .post-header {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .post-votes {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 40px;
+      padding-top: 2px;
+    }
+    .vote-btn {
+      background: none;
+      border: none;
+      color: #d1d5da;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 2px 8px;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+    .vote-btn:hover { color: #0366d6; }
+    .vote-btn.upvote.active { color: #28a745; }
+    .vote-btn.downvote.active { color: #d73a49; }
+    .vote-score {
+      font-size: 18px;
+      font-weight: 600;
+      color: #24292e;
+    }
+    .post-body { flex: 1; }
+    .post-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .post-title a { color: #24292e; }
+    .post-title a:hover { text-decoration: underline; }
+    .post-content {
+      font-size: 16px;
+      color: #24292e;
+      margin: 12px 0;
+      line-height: 1.8;
+    }
+    .post-content p { margin-bottom: 12px; }
+    .post-content pre {
+      background: #f6f8fa;
+      padding: 12px 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 14px;
+      margin: 8px 0;
+    }
+    .post-content code {
+      background: #f6f8fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .post-meta {
+      font-size: 13px;
+      color: #586069;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: 12px;
+    }
+    .post-source {
+      background: #f1f8ff;
+      color: #0366d6;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+    .post-source.reddit { background: #ffedeb; color: #ff4500; }
+    .post-source.hackernews { background: #f6f6ef; color: #ff6600; }
+    .post-source.devto { background: #f0f0f0; color: #0a0a0a; }
+    .post-source.user { background: #e6f9ed; color: #28a745; }
+    .save-btn {
+      background: none;
+      border: 1px solid #e1e4e8;
+      padding: 2px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #586069;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .save-btn:hover { background: #f1f8ff; border-color: #0366d6; }
+
+    .comments-section {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      padding: 24px;
+      margin-top: 16px;
+      margin-bottom: 40px;
+    }
+    .comments-section h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .comment-form textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+      transition: border-color 0.2s;
+    }
+    .comment-form textarea:focus {
+      outline: none;
+      border-color: #0366d6;
+      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+    }
+    .comment-form .btn-submit {
+      margin-top: 8px;
+      padding: 6px 20px;
+      background: #0366d6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .comment-form .btn-submit:hover { background: #0255b3; }
+    .comment-form .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .comment {
+      padding: 12px 0;
+      border-bottom: 1px solid #e1e4e8;
+    }
+    .comment:last-child { border-bottom: none; }
+    .comment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #586069;
+      margin-bottom: 4px;
+    }
+    .comment-header .username { font-weight: 500; color: #24292e; }
+    .comment-content { font-size: 14px; line-height: 1.6; }
+    .comment-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 13px;
+      align-items: center;
+    }
+    .comment-actions .vote-btn {
+      font-size: 14px;
+      padding: 0 4px;
+    }
+    .comment-actions .vote-score { font-size: 13px; }
+    .comment-actions .reply-btn {
+      background: none;
+      border: none;
+      color: #0366d6;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .comment-actions .reply-btn:hover { text-decoration: underline; }
+    .comment .replies { margin-left: 24px; padding-left: 16px; border-left: 2px solid #e1e4e8; }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px 0;
+      color: #586069;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .alert-error {
+      background: #ffeef0;
+      border: 1px solid #f97583;
+      color: #d73a49;
+    }
+    .alert-success {
+      background: #e6ffed;
+      border: 1px solid #85e89d;
+      color: #28a745;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 14px;
+      color: #586069;
+    }
+    .back-link:hover { color: #0366d6; }
+
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: auto;
+    }
+    .footer p { margin: 4px 0; }
+
+    @media (max-width: 600px) {
+      .post-card { padding: 16px; }
+      .post-title { font-size: 20px; }
+      .post-header { flex-wrap: wrap; }
+      .post-votes { flex-direction: row; width: 100%; justify-content: flex-start; gap: 4px; }
+      .comments-section { padding: 16px; }
+      .comment .replies { margin-left: 12px; padding-left: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="/">Sub Zero</a>
+      </div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/search">Search</a>
+        <% if logged_in? %>
+          <a href="/settings">Settings</a>
+          <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
+        <% else %>
+          <a href="/login">Login</a>
+          <a href="/signup" class="btn-primary">Sign Up</a>
+        <% end %>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" x-data="postPage()" x-init="loadPost()">
+    <!-- Loading -->
+    <div x-show="loading" style="text-align:center;padding:40px 0;color:#586069;">Loading post...</div>
+
+    <!-- Post -->
+    <div x-show="!loading && post" class="post-card">
+      <div class="post-header">
+        <div class="post-votes">
+          <button class="vote-btn upvote" :class="{ active: post.user_vote === 1 }" @click="vote(1)">▲</button>
+          <span class="vote-score" x-text="post.score || 0"></span>
+          <button class="vote-btn downvote" :class="{ active: post.user_vote === -1 }" @click="vote(-1)">▼</button>
+        </div>
+        <div class="post-body">
+          <h1 class="post-title">
+            <a :href="post.url || '#'" target="_blank" x-text="post.title"></a>
+          </h1>
+          <div class="post-content" x-html="post.content || ''"></div>
+          <div class="post-meta">
+            <span class="post-source" :class="post.source" x-text="post.source"></span>
+            <span x-text="timeAgo(post.created_at)"></span>
+            <span x-text="post.comment_count + ' comments'"></span>
+            <% if logged_in? %>
+              <button class="save-btn" @click="savePost" x-text="post.saved ? 'Unsave' : 'Save'"></button>
+            <% end %>
+          </div>
+        </div>
+      </div>
+      <a href="/" class="back-link">← Back to feed</a>
+    </div>
+
+    <!-- Not found -->
+    <div x-show="!loading && !post" class="post-card" style="text-align:center;padding:40px 0;">
+      <p style="color:#586069;">Post not found.</p>
+      <a href="/" class="back-link">← Back to feed</a>
+    </div>
+
+    <!-- Comments -->
+    <div class="comments-section" x-show="!loading && post">
+      <h2 x-text="post.comment_count + ' comments'"></h2>
+
+      <!-- Comment form -->
+      <% if logged_in? %>
+        <div class="comment-form">
+          <textarea x-model="newComment" placeholder="Write a comment..." rows="3"></textarea>
+          <button class="btn-submit" @click="submitComment" :disabled="commentLoading || !newComment.trim()">
+            <span x-show="!commentLoading">Post Comment</span>
+            <span x-show="commentLoading">Posting...</span>
+          </button>
+        </div>
+      <% else %>
+        <p style="color:#586069;font-size:14px;margin-bottom:12px;">
+          <a href="/login">Log in</a> to comment.
+        </p>
+      <% end %>
+
+      <!-- Comments list -->
+      <div x-show="comments.length === 0" class="empty-state">No comments yet. Be the first!</div>
+
+      <template x-for="comment in comments" :key="comment.id">
+        <div class="comment">
+          <div class="comment-header">
+            <span class="username" x-text="comment.username || 'deleted'"></span>
+            <span x-text="timeAgo(comment.created_at)"></span>
+          </div>
+          <div class="comment-content" x-text="comment.content"></div>
+          <div class="comment-actions">
+            <button class="vote-btn upvote" :class="{ active: comment.user_vote === 1 }" @click="voteComment(comment.id, 1)">▲</button>
+            <span class="vote-score" x-text="comment.score || 0"></span>
+            <button class="vote-btn downvote" :class="{ active: comment.user_vote === -1 }" @click="voteComment(comment.id, -1)">▼</button>
+            <button class="reply-btn" @click="showReply(comment.id)">Reply</button>
+          </div>
+          <!-- Reply form -->
+          <div x-show="replyTo === comment.id" style="margin-top:8px;">
+            <textarea x-model="replyContent" placeholder="Write a reply..." rows="2" style="width:100%;padding:8px 10px;border:1px solid #e1e4e8;border-radius:6px;font-size:14px;font-family:inherit;"></textarea>
+            <button class="btn-submit" style="padding:4px 16px;font-size:13px;margin-top:4px;" @click="submitReply(comment.id)" :disabled="replyLoading || !replyContent.trim()">Post Reply</button>
+            <button style="background:none;border:none;color:#586069;font-size:13px;cursor:pointer;margin-left:8px;" @click="replyTo = null">Cancel</button>
+          </div>
+          <!-- Replies -->
+          <div class="replies" x-show="comment.replies && comment.replies.length > 0">
+            <template x-for="reply in comment.replies" :key="reply.id">
+              <div class="comment" style="padding:8px 0;">
+                <div class="comment-header">
+                  <span class="username" x-text="reply.username || 'deleted'"></span>
+                  <span x-text="timeAgo(reply.created_at)"></span>
+                </div>
+                <div class="comment-content" x-text="reply.content"></div>
+                <div class="comment-actions">
+                  <button class="vote-btn upvote" :class="{ active: reply.user_vote === 1 }" @click="voteComment(reply.id, 1)">▲</button>
+                  <span class="vote-score" x-text="reply.score || 0"></span>
+                  <button class="vote-btn downvote" :class="{ active: reply.user_vote === -1 }" @click="voteComment(reply.id, -1)">▼</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/alpinejs@3.13.3" defer></script>
+  <script>
+    function postPage() {
+      const postId = window.location.pathname.split('/').pop();
+
+      return {
+        post: null,
+        comments: [],
+        loading: true,
+        newComment: '',
+        commentLoading: false,
+        replyTo: null,
+        replyContent: '',
+        replyLoading: false,
+        currentUser: <%= logged_in? ? "true" : "false" %>,
+
+        loadPost() {
+          this.loading = true;
+          fetch(`/api/posts/${postId}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 'success') {
+                this.post = data.post;
+                this.comments = data.comments || [];
+                // Add replies structure
+                this.comments = this.buildCommentTree(this.comments);
+              } else {
+                this.post = null;
+              }
+              this.loading = false;
+            })
+            .catch(() => {
+              this.loading = false;
+              this.post = null;
+            });
+        },
+
+        buildCommentTree(comments) {
+          const map = {};
+          const roots = [];
+          comments.forEach(c => { map[c.id] = { ...c, replies: [] }; });
+          comments.forEach(c => {
+            if (c.parent_id && map[c.parent_id]) {
+              map[c.parent_id].replies.push(map[c.id]);
+            } else if (!c.parent_id) {
+              roots.push(map[c.id]);
+            }
+          });
+          return roots;
+        },
+
+        timeAgo(date) {
+          if (!date) return 'recently';
+          const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+          if (seconds < 60) return 'just now';
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return minutes + 'm ago';
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return hours + 'h ago';
+          const days = Math.floor(hours / 24);
+          return days + 'd ago';
+        },
+
+        vote(direction) {
+          if (!this.currentUser) { alert('Please login to vote'); return; }
+          const endpoint = direction === 1 ? `/api/posts/${postId}/upvote` : `/api/posts/${postId}/downvote`;
+          fetch(endpoint, { method: 'POST' })
+            .then(res => res.json())
+            .then(() => {
+              if (this.post.user_vote === direction) {
+                this.post.user_vote = 0;
+                this.post.score -= direction;
+              } else {
+                if (this.post.user_vote) {
+                  this.post.score -= this.post.user_vote;
+                }
+                this.post.user_vote = direction;
+                this.post.score += direction;
+              }
+            });
+        },
+
+        voteComment(commentId, direction) {
+          if (!this.currentUser) { alert('Please login to vote'); return; }
+          const endpoint = direction === 1 ? `/api/comments/${commentId}/upvote` : `/api/comments/${commentId}/downvote`;
+          fetch(endpoint, { method: 'POST' })
+            .then(res => res.json())
+            .then(() => {
+              // Update comment score in tree
+              const update = (items) => {
+                for (let c of items) {
+                  if (c.id === commentId) {
+                    if (c.user_vote === direction) {
+                      c.user_vote = 0;
+                      c.score -= direction;
+                    } else {
+                      if (c.user_vote) c.score -= c.user_vote;
+                      c.user_vote = direction;
+                      c.score += direction;
+                    }
+                    return true;
+                  }
+                  if (c.replies && update(c.replies)) return true;
+                }
+                return false;
+              };
+              update(this.comments);
+            });
+        },
+
+        savePost() {
+          if (!this.currentUser) { alert('Please login to save'); return; }
+          const method = this.post.saved ? 'DELETE' : 'POST';
+          fetch(`/api/posts/${postId}/save`, { method })
+            .then(res => res.json())
+            .then(() => { this.post.saved = !this.post.saved; });
+        },
+
+        submitComment() {
+          if (!this.currentUser) { alert('Please login to comment'); return; }
+          if (!this.newComment.trim()) return;
+
+          this.commentLoading = true;
+          fetch('/api/comments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              post_id: parseInt(postId),
+              content: this.newComment.trim()
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.commentLoading = false;
+            if (data.status === 'success') {
+              this.newComment = '';
+              this.loadPost();
+            } else {
+              alert(data.message || 'Failed to post comment');
+            }
+          })
+          .catch(() => {
+            this.commentLoading = false;
+            alert('Something went wrong');
+          });
+        },
+
+        showReply(commentId) {
+          this.replyTo = this.replyTo === commentId ? null : commentId;
+          this.replyContent = '';
+        },
+
+        submitReply(commentId) {
+          if (!this.currentUser) { alert('Please login to reply'); return; }
+          if (!this.replyContent.trim()) return;
+
+          this.replyLoading = true;
+          fetch('/api/comments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              post_id: parseInt(postId),
+              content: this.replyContent.trim(),
+              parent_id: commentId
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.replyLoading = false;
+            if (data.status === 'success') {
+              this.replyTo = null;
+              this.replyContent = '';
+              this.loadPost();
+            } else {
+              alert(data.message || 'Failed to post reply');
+            }
+          })
+          .catch(() => {
+            this.replyLoading = false;
+            alert('Something went wrong');
+          });
+        }
+      };
+    }
+  </script>
+</body>
+</html>
