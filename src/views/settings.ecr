@@ -1,0 +1,549 @@
+<!-- views/settings.ecr - User Settings page for Sub Zero -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Sub Zero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f6f8fa;
+      color: #24292e;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 16px; width: 100%; }
+
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 0;
+    }
+    .header-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #24292e;
+    }
+    .logo a { color: #24292e; }
+    .logo a:hover { text-decoration: none; }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .nav a { color: #586069; }
+    .nav a:hover { color: #0366d6; text-decoration: none; }
+    .nav a.active { color: #24292e; font-weight: 600; }
+
+    .settings-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      padding: 32px 24px;
+      margin-top: 24px;
+      margin-bottom: 24px;
+    }
+    .settings-card h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .settings-card .subtitle {
+      color: #586069;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .settings-section {
+      border-top: 1px solid #e1e4e8;
+      padding-top: 20px;
+      margin-top: 20px;
+    }
+    .settings-section:first-of-type {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+    .settings-section h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .settings-section .section-desc {
+      color: #586069;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #24292e;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      background: #fff;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0366d6;
+      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+    }
+    .form-group input.error {
+      border-color: #d73a49;
+    }
+    .form-group .error-text {
+      color: #d73a49;
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+    .form-group .error-text.show { display: block; }
+    .form-group .hint {
+      color: #586069;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .form-row {
+      display: flex;
+      gap: 16px;
+    }
+    .form-row .form-group { flex: 1; }
+
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary {
+      background: #0366d6;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #0255b3; }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-danger {
+      background: #d73a49;
+      color: #fff;
+    }
+    .btn-danger:hover { background: #cb2431; }
+    .btn-outline {
+      background: none;
+      border: 1px solid #e1e4e8;
+      color: #24292e;
+    }
+    .btn-outline:hover { background: #f6f8fa; }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .alert-error {
+      background: #ffeef0;
+      border: 1px solid #f97583;
+      color: #d73a49;
+    }
+    .alert-success {
+      background: #e6ffed;
+      border: 1px solid #85e89d;
+      color: #28a745;
+    }
+
+    .danger-zone {
+      border: 1px solid #f97583;
+      border-radius: 6px;
+      padding: 16px;
+      background: #ffeef0;
+      margin-top: 8px;
+    }
+    .danger-zone h3 {
+      color: #d73a49;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .danger-zone p {
+      color: #586069;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: auto;
+    }
+    .footer p { margin: 4px 0; }
+
+    @media (max-width: 600px) {
+      .settings-card { padding: 20px 16px; }
+      .settings-card h1 { font-size: 20px; }
+      .form-row { flex-direction: column; gap: 0; }
+      .header-inner { flex-wrap: wrap; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="/">Sub Zero</a>
+      </div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/settings" class="active">Settings</a>
+        <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="settings-card">
+      <h1>Settings</h1>
+      <p class="subtitle">Manage your account preferences.</p>
+
+      <!-- Success/Error Messages -->
+      <div id="alerts"></div>
+
+      <!-- Profile Section -->
+      <div class="settings-section" x-data="profileForm()">
+        <h2>Profile</h2>
+        <p class="section-desc">Update your profile information.</p>
+
+        <form @submit.prevent="updateProfile">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" x-model="username" disabled>
+            <div class="hint">Username cannot be changed.</div>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" x-model="email" :class="{ error: errors.email }">
+            <div class="error-text" :class="{ show: errors.email }" x-text="errors.email"></div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" :disabled="loading">
+            <span x-show="!loading">Update Profile</span>
+            <span x-show="loading">Updating...</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Password Section -->
+      <div class="settings-section" x-data="passwordForm()">
+        <h2>Password</h2>
+        <p class="section-desc">Change your password.</p>
+
+        <form @submit.prevent="changePassword">
+          <div class="form-group">
+            <label for="current_password">Current Password</label>
+            <input type="password" id="current_password" x-model="currentPassword" :class="{ error: errors.currentPassword }">
+            <div class="error-text" :class="{ show: errors.currentPassword }" x-text="errors.currentPassword"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="new_password">New Password</label>
+            <input type="password" id="new_password" x-model="newPassword" :class="{ error: errors.newPassword }">
+            <div class="error-text" :class="{ show: errors.newPassword }" x-text="errors.newPassword"></div>
+            <div class="hint">At least 6 characters.</div>
+          </div>
+
+          <div class="form-group">
+            <label for="confirm_password">Confirm New Password</label>
+            <input type="password" id="confirm_password" x-model="confirmPassword" :class="{ error: errors.confirmPassword }">
+            <div class="error-text" :class="{ show: errors.confirmPassword }" x-text="errors.confirmPassword"></div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" :disabled="loading">
+            <span x-show="!loading">Change Password</span>
+            <span x-show="loading">Changing...</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Preferences Section -->
+      <div class="settings-section" x-data="preferencesForm()">
+        <h2>Preferences</h2>
+        <p class="section-desc">Customize your feed experience.</p>
+
+        <form @submit.prevent="updatePreferences">
+          <div class="form-group">
+            <label for="default_feed">Default Feed</label>
+            <select id="default_feed" x-model="defaultFeed" style="width:100%;padding:8px 12px;border:1px solid #e1e4e8;border-radius:6px;font-size:14px;background:#fff;">
+              <option value="mixed">Mixed</option>
+              <option value="hot">Hot</option>
+              <option value="new">New</option>
+              <option value="top">Top</option>
+              <option value="personalized">For You</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Sources to Show</label>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:4px;">
+              <label style="font-weight:400;font-size:14px;display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" x-model="sources.reddit"> Reddit
+              </label>
+              <label style="font-weight:400;font-size:14px;display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" x-model="sources.hackernews"> Hacker News
+              </label>
+              <label style="font-weight:400;font-size:14px;display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" x-model="sources.devto"> Dev.to
+              </label>
+              <label style="font-weight:400;font-size:14px;display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" x-model="sources.user"> User Posts
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" :disabled="loading">
+            <span x-show="!loading">Save Preferences</span>
+            <span x-show="loading">Saving...</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="settings-section">
+        <h2>Danger Zone</h2>
+        <p class="section-desc">Permanently delete your account.</p>
+
+        <div class="danger-zone" x-data="deleteForm()">
+          <h3>Delete Account</h3>
+          <p>Once deleted, your account and all associated data cannot be recovered.</p>
+
+          <form @submit.prevent="deleteAccount">
+            <div class="form-group" style="margin-bottom:12px;">
+              <label for="delete_password">Confirm Password</label>
+              <input type="password" id="delete_password" x-model="password" :class="{ error: errors.password }" placeholder="Enter your password to confirm">
+              <div class="error-text" :class="{ show: errors.password }" x-text="errors.password"></div>
+            </div>
+            <button type="submit" class="btn btn-danger" :disabled="loading">
+              <span x-show="!loading">Delete Account</span>
+              <span x-show="loading">Deleting...</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/alpinejs@3.13.3" defer></script>
+  <script>
+    function showAlert(message, type = 'success') {
+      const container = document.getElementById('alerts');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      container.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
+    }
+
+    function profileForm() {
+      return {
+        username: '<%= current_user["username"] %>',
+        email: '<%= current_user["email"] %>',
+        loading: false,
+        errors: { email: '' },
+        updateProfile() {
+          this.loading = true;
+          this.errors = { email: '' };
+
+          fetch('/api/auth/change-email', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              new_email: this.email,
+              password: prompt('Enter your password to confirm email change:')
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.loading = false;
+            if (data.status === 'success') {
+              showAlert('Email updated successfully!');
+            } else {
+              this.errors.email = data.message || 'Failed to update email';
+            }
+          })
+          .catch(() => {
+            this.loading = false;
+            showAlert('Something went wrong. Please try again.', 'error');
+          });
+        }
+      };
+    }
+
+    function passwordForm() {
+      return {
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+        loading: false,
+        errors: { currentPassword: '', newPassword: '', confirmPassword: '' },
+        changePassword() {
+          let valid = true;
+          this.errors = { currentPassword: '', newPassword: '', confirmPassword: '' };
+
+          if (!this.currentPassword) {
+            this.errors.currentPassword = 'Current password is required';
+            valid = false;
+          }
+          if (!this.newPassword || this.newPassword.length < 6) {
+            this.errors.newPassword = 'New password must be at least 6 characters';
+            valid = false;
+          }
+          if (this.newPassword !== this.confirmPassword) {
+            this.errors.confirmPassword = 'Passwords do not match';
+            valid = false;
+          }
+
+          if (!valid) return;
+
+          this.loading = true;
+
+          fetch('/api/auth/change-password', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              old_password: this.currentPassword,
+              new_password: this.newPassword
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.loading = false;
+            if (data.status === 'success') {
+              showAlert('Password changed successfully!');
+              this.currentPassword = '';
+              this.newPassword = '';
+              this.confirmPassword = '';
+            } else {
+              this.errors.currentPassword = data.message || 'Failed to change password';
+            }
+          })
+          .catch(() => {
+            this.loading = false;
+            showAlert('Something went wrong. Please try again.', 'error');
+          });
+        }
+      };
+    }
+
+    function preferencesForm() {
+      return {
+        defaultFeed: 'mixed',
+        sources: { reddit: true, hackernews: true, devto: true, user: true },
+        loading: false,
+        updatePreferences() {
+          this.loading = true;
+
+          fetch('/api/user/preferences', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              default_feed: this.defaultFeed,
+              sources: this.sources
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.loading = false;
+            if (data.status === 'success') {
+              showAlert('Preferences saved successfully!');
+            } else {
+              showAlert(data.message || 'Failed to save preferences', 'error');
+            }
+          })
+          .catch(() => {
+            this.loading = false;
+            showAlert('Something went wrong. Please try again.', 'error');
+          });
+        }
+      };
+    }
+
+    function deleteForm() {
+      return {
+        password: '',
+        loading: false,
+        errors: { password: '' },
+        deleteAccount() {
+          if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) return;
+
+          let valid = true;
+          this.errors = { password: '' };
+
+          if (!this.password) {
+            this.errors.password = 'Password is required';
+            valid = false;
+          }
+
+          if (!valid) return;
+
+          this.loading = true;
+
+          fetch('/api/auth/delete-account', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: this.password })
+          })
+          .then(res => res.json())
+          .then(data => {
+            this.loading = false;
+            if (data.status === 'success') {
+              window.location.href = '/';
+            } else {
+              this.errors.password = data.message || 'Failed to delete account';
+            }
+          })
+          .catch(() => {
+            this.loading = false;
+            showAlert('Something went wrong. Please try again.', 'error');
+          });
+        }
+      };
+    }
+  </script>
+</body>
+</html>
