@@ -20,20 +20,11 @@ JWT_SECRET = ENV["JWT_SECRET"]? || "your-super-secret-key-change-in-production"
 
 POOL = PG.connect_pool(DB_URL, pool_size: 10, retry_attempts: 3)
 
-require "./db"
-require "./db_algo"
-require "./reddit"
-require "./hn"
-require "./dev_to"
-require "./rec"
-require "./us"
-require "./auth"
-require "./routes/auth"
-require "./routes/posts"
-require "./routes/comments"
-require "./routes/users"
-require "./routes/search"
-require "./routes/feed"
+require "./zero/db/*"
+require "./zero/routes/*"
+require "./zero/algo/*"
+require "./zero/aggregate/*"
+require "./zero/auth"
 
 start_reddit_scheduler
 start_hn_scheduler
