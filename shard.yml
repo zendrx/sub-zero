@@ -20,10 +20,7 @@ dependencies:
   jwt:
     github: crystal-community/jwt
     version: ~> 1.0.0
-  bcrypt:
-    github: jgaskins/bcrypt
-    version: ~> 0.1.0
-
+    
 development_dependencies:
   ameba:
     github: crystal-ameba/ameba
