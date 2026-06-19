@@ -1,0 +1,30 @@
+# shard.yml - Sub Zero aggregator dependencies
+
+name: sub_zero
+version: 0.1.0
+crystal: ">= 1.0.0"
+
+authors:
+  - Your Name <you@email.com>
+
+description: |
+  Content aggregator for Reddit, Hacker News and Dev.to
+
+dependencies:
+  kemal:
+    github: kemalcr/kemal
+    version: ~> 1.5.0
+  pg:
+    github: will/crystal-pg
+    version: ~> 0.27.0
+  jwt:
+    github: crystal-community/jwt
+    version: ~> 1.0.0
+  bcrypt:
+    github: jgaskins/bcrypt
+    version: ~> 0.1.0
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.0.0
