@@ -151,11 +151,13 @@ post "/logout" do |env|
 end
 
 def logged_in?(env)
-  env.get("logged_in")?.try &.as(Bool) || false
+  value = env.get("logged_in")
+  value.is_a?(Bool) ? value : false
 end
 
 def current_user(env)
-  env.get("current_user")?.as(Hash(String, JSON::Type)?) || {} of String => JSON::Type
+  value = env.get("current_user")
+  value.is_a?(Hash(String, JSON::Type)) ? value : {} of String => JSON::Type
 end
 
 port = ENV["PORT"]?.try &.to_i || 3000
