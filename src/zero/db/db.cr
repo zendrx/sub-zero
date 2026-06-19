@@ -81,7 +81,6 @@ def setup_database
   POOL.exec "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)"
 end
 
-# Health check
 def db_healthy? : Bool
   POOL.exec("SELECT 1")
   true
@@ -89,14 +88,16 @@ rescue e
   false
 end
 
-# User operations
 module UserDB
   def self.create(username : String, email : String, password_hash : String) : Int64?
     result = POOL.exec(
       "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
       username, email, password_hash
     )
-    result.to_a.first?[0]?.try &.to_i64
+    result.each do |row|
+      return row[0].to_i64
+    end
+    nil
   rescue e : PG::Error
     puts "Failed to create user: #{e.message}"
     nil
@@ -107,17 +108,17 @@ module UserDB
       "SELECT id, username, email, created_at, last_login, is_admin FROM users WHERE id = $1",
       id
     )
-    row = result.to_a.first?
-    return nil unless row
-
-    {
-      "id"         => row[0].to_i64,
-      "username"   => row[1].to_s,
-      "email"      => row[2].to_s,
-      "created_at" => row[3].to_s,
-      "last_login" => row[4]?.try &.to_s || "",
-      "is_admin"   => row[5]?.try &.to_bool || false
-    }
+    result.each do |row|
+      return {
+        "id"         => row[0].to_i64,
+        "username"   => row[1].to_s,
+        "email"      => row[2].to_s,
+        "created_at" => row[3].to_s,
+        "last_login" => row[4]?.try &.to_s || "",
+        "is_admin"   => row[5]?.try &.to_bool || false
+      }
+    end
+    nil
   end
 
   def self.find_by_username(username : String) : Hash(String, JSON::Type)?
@@ -125,17 +126,17 @@ module UserDB
       "SELECT id, username, email, password_hash, created_at, is_admin FROM users WHERE username = $1",
       username
     )
-    row = result.to_a.first?
-    return nil unless row
-
-    {
-      "id"            => row[0].to_i64,
-      "username"      => row[1].to_s,
-      "email"         => row[2].to_s,
-      "password_hash" => row[3].to_s,
-      "created_at"    => row[4].to_s,
-      "is_admin"      => row[5]?.try &.to_bool || false
-    }
+    result.each do |row|
+      return {
+        "id"            => row[0].to_i64,
+        "username"      => row[1].to_s,
+        "email"         => row[2].to_s,
+        "password_hash" => row[3].to_s,
+        "created_at"    => row[4].to_s,
+        "is_admin"      => row[5]?.try &.to_bool || false
+      }
+    end
+    nil
   end
 
   def self.find_by_email(email : String) : Hash(String, JSON::Type)?
@@ -143,17 +144,17 @@ module UserDB
       "SELECT id, username, email, password_hash, created_at, is_admin FROM users WHERE email = $1",
       email
     )
-    row = result.to_a.first?
-    return nil unless row
-
-    {
-      "id"            => row[0].to_i64,
-      "username"      => row[1].to_s,
-      "email"         => row[2].to_s,
-      "password_hash" => row[3].to_s,
-      "created_at"    => row[4].to_s,
-      "is_admin"      => row[5]?.try &.to_bool || false
-    }
+    result.each do |row|
+      return {
+        "id"            => row[0].to_i64,
+        "username"      => row[1].to_s,
+        "email"         => row[2].to_s,
+        "password_hash" => row[3].to_s,
+        "created_at"    => row[4].to_s,
+        "is_admin"      => row[5]?.try &.to_bool || false
+      }
+    end
+    nil
   end
 
   def self.update_last_login(id : Int64) : Bool
@@ -169,17 +170,28 @@ module UserDB
       "SELECT COUNT(*) FROM users WHERE username = $1 OR email = $2",
       username, email
     )
-    count = result.to_a.first?[0].to_i
+    count = 0
+    result.each do |row|
+      count = row[0].to_i
+    end
     count > 0
   end
 
   def self.username_exists?(username : String) : Bool
     result = POOL.exec("SELECT COUNT(*) FROM users WHERE username = $1", username)
-    result.to_a.first?[0].to_i > 0
+    count = 0
+    result.each do |row|
+      count = row[0].to_i
+    end
+    count > 0
   end
 
   def self.email_exists?(email : String) : Bool
     result = POOL.exec("SELECT COUNT(*) FROM users WHERE email = $1", email)
-    result.to_a.first?[0].to_i > 0
+    count = 0
+    result.each do |row|
+      count = row[0].to_i
+    end
+    count > 0
   end
 end
