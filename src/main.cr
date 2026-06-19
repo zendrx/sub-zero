@@ -18,7 +18,7 @@ end
 DB_URL = ENV["DATABASE_URL"]? || "postgresql://postgres:password@localhost:5432/subzero"
 JWT_SECRET = ENV["JWT_SECRET"]? || "your-super-secret-key-change-in-production"
 
-POOL = PG.connect_pool(DB_URL, pool_size: 10, retry_attempts: 3)
+POOL = PG.connect(DB_URL)
 
 require "./zero/db/*"
 require "./zero/routes/*"
