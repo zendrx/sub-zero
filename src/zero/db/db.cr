@@ -3,10 +3,6 @@
 require "pg"
 require "json"
 
-DB_URL = ENV["DATABASE_URL"]? || "postgresql://user:pass@localhost:5432/aggregator"
-
-POOL = PG.connect_pool(DB_URL, pool_size: 10, retry_attempts: 3)
-
 def setup_database
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS users (
