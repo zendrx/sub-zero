@@ -1,5 +1,4 @@
 # routes/posts.cr - Post routes for Crystal Aggregator
-# Handles all post operations including CRUD, voting, saving, and feed generation
 
 require "json"
 require "kemal"
@@ -14,7 +13,6 @@ get "/api/posts" do |env|
     limit = 100
   end
   
-  # Check if user is authenticated for personalized feeds
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
   feed_type_enum = case feed_type
@@ -29,7 +27,6 @@ get "/api/posts" do |env|
                    else RecommendationEngine::FeedType::Hot
                    end
   
-  # If feed requires authentication and user is not logged in
   if (feed_type_enum == RecommendationEngine::FeedType::Personalized || 
       feed_type_enum == RecommendationEngine::FeedType::Discovery ||
       feed_type_enum == RecommendationEngine::FeedType::Collaborative ||
@@ -78,10 +75,8 @@ get "/api/posts/:id" do |env|
     }.to_json
   end
   
-  # Get comments for this post
   comments = CommentDB.get_for_post(id, 50, 0)
   
-  # Check if user has voted on this post
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   user_vote = nil
   if valid && user_id
@@ -110,9 +105,20 @@ post "/api/posts" do |env|
   end
   
   begin
-    title = env.params.json["title"]?.try &.as(String) || ""
-    url = env.params.json["url"]?.try &.as(String) || ""
-    content = env.params.json["content"]?.try &.as(String) || ""
+    body = env.request.body
+    if body.nil?
+      env.response.status_code = 400
+      next {
+        "status"  => "error",
+        "message" => "Request body is empty"
+      }.to_json
+    end
+    
+    json_params = JSON.parse(body)
+    
+    title = json_params["title"]?.try &.as_s || ""
+    url = json_params["url"]?.try &.as_s || ""
+    content = json_params["content"]?.try &.as_s || ""
     
     if title.empty?
       env.response.status_code = 400
@@ -130,34 +136,25 @@ post "/api/posts" do |env|
       }.to_json
     end
     
-    # Insert post with user_id
-    result = POOL.exec(
+    result = POOL.query(
       "INSERT INTO posts (title, url, content, source, user_id, is_user_post) 
        VALUES ($1, $2, $3, 'user', $4, true) RETURNING id",
       title, url, content, user_id
     )
+    result.move_next
+    post_id = result.read(Int64)
     
-    post_id = result.rows.first?[0]?.try &.to_i64
-    
-    if post_id
-      env.response.status_code = 201
-      {
-        "status"  => "success",
-        "message" => "Post created successfully",
-        "post_id" => post_id
-      }.to_json
-    else
-      env.response.status_code = 500
-      {
-        "status"  => "error",
-        "message" => "Failed to create post"
-      }.to_json
-    end
+    env.response.status_code = 201
+    {
+      "status"  => "success",
+      "message" => "Post created successfully",
+      "post_id" => post_id
+    }.to_json
   rescue e : Exception
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Internal server error"
+      "message" => "Internal server error: #{e.message}"
     }.to_json
   end
 end
@@ -174,7 +171,7 @@ put "/api/posts/:id" do |env|
     }.to_json
   end
   
-  valid, user_id, user = Auth.validate_session(env.request.headers, env.request.cookies)
+  valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
   if !valid || !user_id
     env.response.status_code = 401
@@ -184,14 +181,11 @@ put "/api/posts/:id" do |env|
     }.to_json
   end
   
-  # Check if post exists and belongs to user or user is admin
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT user_id, is_user_post FROM posts WHERE id = $1",
     id
   )
-  row = result.rows.first?
-  
-  if row.nil?
+  if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
@@ -199,10 +193,9 @@ put "/api/posts/:id" do |env|
     }.to_json
   end
   
-  post_user_id = row[0]?.try &.to_i64
-  is_user_post = row[1]?.try &.to_bool || false
+  post_user_id = result.read(Int64?)
+  is_user_post = result.read(Bool?) || false
   
-  # Only allow editing if it's a user post
   if !is_user_post
     env.response.status_code = 403
     next {
@@ -211,7 +204,6 @@ put "/api/posts/:id" do |env|
     }.to_json
   end
   
-  # Check if user is author or admin
   is_admin = Auth.is_admin?(user_id)
   if post_user_id != user_id && !is_admin
     env.response.status_code = 403
@@ -222,11 +214,21 @@ put "/api/posts/:id" do |env|
   end
   
   begin
-    title = env.params.json["title"]?.try &.as(String)
-    url = env.params.json["url"]?.try &.as(String)
-    content = env.params.json["content"]?.try &.as(String)
+    body = env.request.body
+    if body.nil?
+      env.response.status_code = 400
+      next {
+        "status"  => "error",
+        "message" => "Request body is empty"
+      }.to_json
+    end
     
-    # Build update query dynamically
+    json_params = JSON.parse(body)
+    
+    title = json_params["title"]?.try &.as_s
+    url = json_params["url"]?.try &.as_s
+    content = json_params["content"]?.try &.as_s
+    
     updates = [] of String
     params = [] of String | Int64
     
@@ -297,14 +299,11 @@ delete "/api/posts/:id" do |env|
     }.to_json
   end
   
-  # Check if post exists and belongs to user or user is admin
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT user_id, is_user_post FROM posts WHERE id = $1",
     id
   )
-  row = result.rows.first?
-  
-  if row.nil?
+  if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
@@ -312,10 +311,9 @@ delete "/api/posts/:id" do |env|
     }.to_json
   end
   
-  post_user_id = row[0]?.try &.to_i64
-  is_user_post = row[1]?.try &.to_bool || false
+  post_user_id = result.read(Int64?)
+  is_user_post = result.read(Bool?) || false
   
-  # Only allow deleting user posts
   if !is_user_post
     env.response.status_code = 403
     next {
@@ -541,7 +539,7 @@ get "/api/posts/source/:source" do |env|
     limit = 100
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE source = $1 AND is_user_post = false
@@ -550,16 +548,22 @@ get "/api/posts/source/:source" do |env|
     source, limit, offset
   )
   
-  posts = result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
   
   env.response.status_code = 200
@@ -594,7 +598,7 @@ get "/api/posts/user/:user_id" do |env|
     limit = 100
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT id, title, url, content, source, score, comment_count, created_at
      FROM posts
      WHERE user_id = $1 AND is_user_post = true
@@ -603,17 +607,28 @@ get "/api/posts/user/:user_id" do |env|
     user_id, limit, offset
   )
   
-  posts = result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "content"       => row[3]?.try &.to_s || "",
-      "source"        => row[4].to_s,
-      "score"         => row[5].to_i,
-      "comment_count" => row[6].to_i,
-      "created_at"    => row[7].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    content = result.read(String?)
+    if content
+      post["content"] = JSON::Any.new(content)
+    else
+      post["content"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
   
   env.response.status_code = 200
@@ -650,13 +665,14 @@ get "/api/posts/:id/comments" do |env|
   
   comments = CommentDB.get_for_post(id, limit, offset)
   
-  # Get user votes if authenticated
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   user_votes = {} of Int64 => Int32
   if valid && user_id
     comments.each do |comment|
-      vote = VoteDB.get_comment_vote(user_id, comment["id"].to_i64)
-      user_votes[comment["id"].to_i64] = vote if vote
+      vote = VoteDB.get_comment_vote(user_id, comment["id"].as_i64)
+      if vote
+        user_votes[comment["id"].as_i64] = vote
+      end
     end
   end
   
@@ -682,7 +698,7 @@ get "/api/posts/random" do |env|
     limit = 50
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE is_user_post = false
@@ -691,16 +707,22 @@ get "/api/posts/random" do |env|
     limit
   )
   
-  posts = result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
   
   env.response.status_code = 200
