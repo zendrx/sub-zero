@@ -1,5 +1,4 @@
 # routes/comments.cr - Comment routes for Crystal Aggregator
-# Handles all comment operations including CRUD, voting, and replies
 
 require "json"
 require "kemal"
@@ -17,9 +16,10 @@ post "/api/comments" do |env|
   end
   
   begin
-    post_id = env.params.json["post_id"]?.try &.to_i64
-    content = env.params.json["content"]?.try &.as(String) || ""
-    parent_id = env.params.json["parent_id"]?.try &.to_i64
+    # Fix: Use as_i64 instead of to_i64, and handle the value properly
+    post_id = env.params.json["post_id"]?.try &.as_i64
+    content = env.params.json["content"]?.try &.as_s || ""
+    parent_id = env.params.json["parent_id"]?.try &.as_i64
     
     if post_id.nil?
       env.response.status_code = 400
@@ -175,7 +175,7 @@ put "/api/comments/:id" do |env|
   end
   
   begin
-    content = env.params.json["content"]?.try &.as(String) || ""
+    content = env.params.json["content"]?.try &.as_s || ""
     
     if content.empty?
       env.response.status_code = 400
