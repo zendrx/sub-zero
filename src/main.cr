@@ -133,20 +133,30 @@ get "/health" do |env|
   }.to_json
 end
 
-def logged_in?(env)
-  value = env.get("logged_in")
+# Helper functions that work without arguments in templates
+def logged_in?
+  current_context = Kemal::Handler::INSTANCE.context
+  value = current_context.get("logged_in")
   value.is_a?(Bool) ? value : false
 end
 
-def current_user(env)
-  value = env.get("current_user")
-  value.is_a?(Hash(String, JSON::Any)) ? value : {} of String => JSON::Any
+def current_user
+  current_context = Kemal::Handler::INSTANCE.context
+  value = current_context.get("current_user")
+  if value.is_a?(String)
+    begin
+      JSON.parse(value)
+    rescue
+      {} of String => JSON::Any
+    end
+  else
+    {} of String => JSON::Any
+  end
 end
 
 get "/" do |env|
   valid, user_id, user = Auth.validate_session(env.request.headers, env.request.cookies)
   env.set "logged_in", valid && user_id ? true : false
-  # Store user as a JSON string since we can't store Hash directly
   env.set "current_user", user.to_json
   render "views/index.ecr"
 end
