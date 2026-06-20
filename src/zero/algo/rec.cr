@@ -27,27 +27,27 @@ module RecommendationEngine
       get_top_feed(limit, offset)
     when FeedType::Personalized
       if user_id
-        get_personalized_feed(user_id, limit, offset)
+        get_personalized_feed(user_id, limit, offset) || [] of Hash(String, JSON::Any)
       else
         get_hot_feed(limit, offset)
       end
     when FeedType::Trending
-      get_trending_feed(limit)
+      get_trending_feed(limit) || [] of Hash(String, JSON::Any)
     when FeedType::Discovery
       if user_id
-        get_discovery_feed(user_id, limit)
+        get_discovery_feed(user_id, limit) || [] of Hash(String, JSON::Any)
       else
         get_hot_feed(limit, offset)
       end
     when FeedType::Collaborative
       if user_id
-        get_collaborative_feed(user_id, limit)
+        get_collaborative_feed(user_id, limit) || [] of Hash(String, JSON::Any)
       else
         get_hot_feed(limit, offset)
       end
     when FeedType::Mixed
       if user_id
-        get_mixed_feed(user_id, limit)
+        get_mixed_feed(user_id, limit) || [] of Hash(String, JSON::Any)
       else
         get_hot_feed(limit, offset)
       end
@@ -228,21 +228,24 @@ module RecommendationEngine
 
   # Trending feed - posts with recent engagement spikes
   def self.get_trending_feed(limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    AlgoDB.get_trending_posts(limit).map do |post|
+    posts = AlgoDB.get_trending_posts(limit)
+    posts.map do |post|
       post.merge({"feed_type" => JSON::Any.new("trending")})
     end
   end
 
   # Discovery feed - new sources the user hasn't explored
   def self.get_discovery_feed(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    AlgoDB.get_discovery_posts(user_id, limit).map do |post|
+    posts = AlgoDB.get_discovery_posts(user_id, limit)
+    posts.map do |post|
       post.merge({"feed_type" => JSON::Any.new("discovery")})
     end
   end
 
   # Collaborative feed - what similar users like
   def self.get_collaborative_feed(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    AlgoDB.get_collaborative_recommendations(user_id, limit).map do |post|
+    posts = AlgoDB.get_collaborative_recommendations(user_id, limit)
+    posts.map do |post|
       post.merge({"feed_type" => JSON::Any.new("collaborative")})
     end
   end
