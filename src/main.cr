@@ -26,9 +26,25 @@ require "./zero/algo/*"
 require "./zero/aggregate/*"
 require "./zero/auth"
 
+# Start schedulers (these are defined in the aggregate files)
 start_reddit_scheduler
 start_hn_scheduler
 start_devto_scheduler
+
+# Start prune scheduler (runs every 5 days)
+def start_prune_scheduler
+  spawn do
+    loop do
+      # Wait 5 days before pruning
+      5.days.sleep
+      puts "Running scheduled prune (every 5 days)..."
+      pruned = PostDB.prune_old_posts(50000)
+      puts "Pruned #{pruned} old external posts" if pruned > 0
+    end
+  end
+end
+
+start_prune_scheduler
 
 error 404 do |env|
   env.response.content_type = "application/json"
@@ -62,7 +78,7 @@ end
 get "/" do |env|
   valid, user_id, user = Auth.validate_session(env.request.headers, env.request.cookies)
   env.set "logged_in", valid && user_id ? true : false
-  env.set "current_user", user || {} of String => JSON::Type
+  env.set "current_user", user || {} of String => JSON::Any
   render "views/index.ecr"
 end
 
@@ -90,7 +106,7 @@ get "/settings" do |env|
     env.redirect "/login"
     next
   end
-  env.set "current_user", user || {} of String => JSON::Type
+  env.set "current_user", user || {} of String => JSON::Any
   render "views/settings.ecr"
 end
 
@@ -148,7 +164,7 @@ end
 
 def current_user(env)
   value = env.get("current_user")
-  value.is_a?(Hash(String, JSON::Type)) ? value : {} of String => JSON::Type
+  value.is_a?(Hash(String, JSON::Any)) ? value : {} of String => JSON::Any
 end
 
 port = ENV["PORT"]?.try &.to_i || 3000
