@@ -16,29 +16,30 @@ post "/api/comments" do |env|
   end
   
   begin
-    # Get JSON params - handle properly
     json_params = env.params.json
     
-    # Get post_id - handle if it's a single value or array
+    # Extract post_id safely
     post_id_value = json_params["post_id"]?
-    post_id = case post_id_value
-              when JSON::Any
-                post_id_value.as_i64
-              when Array(JSON::Any)
+    post_id = if post_id_value.is_a?(Array(JSON::Any))
                 post_id_value.first?.try &.as_i64
               else
-                nil
+                post_id_value.try &.as_i64
               end
     
-    content = json_params["content"]?.try &.as_s || ""
+    # Extract content safely
+    content_value = json_params["content"]?
+    content = if content_value.is_a?(Array(JSON::Any))
+                content_value.first?.try &.as_s || ""
+              else
+                content_value.try &.as_s || ""
+              end
+    
+    # Extract parent_id safely
     parent_id_value = json_params["parent_id"]?
-    parent_id = case parent_id_value
-                when JSON::Any
-                  parent_id_value.as_i64
-                when Array(JSON::Any)
+    parent_id = if parent_id_value.is_a?(Array(JSON::Any))
                   parent_id_value.first?.try &.as_i64
                 else
-                  nil
+                  parent_id_value.try &.as_i64
                 end
     
     if post_id.nil?
@@ -196,7 +197,12 @@ put "/api/comments/:id" do |env|
   end
   
   begin
-    content = env.params.json["content"]?.try &.as_s || ""
+    content_value = env.params.json["content"]?
+    content = if content_value.is_a?(Array(JSON::Any))
+                content_value.first?.try &.as_s || ""
+              else
+                content_value.try &.as_s || ""
+              end
     
     if content.empty?
       env.response.status_code = 400
