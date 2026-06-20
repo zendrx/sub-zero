@@ -92,8 +92,11 @@ module UserAlgorithms
     peak_hour = hours.index(hours.max) || 0
     avg_hourly = hours.sum.to_f / hours.size
     
+    # Convert Array(Int32) to Array(JSON::Any) for JSON serialization
+    hourly_activity = hours.map { |h| JSON::Any.new(h) }
+    
     activity = Hash(String, JSON::Any).new
-    activity["hourly_activity"] = JSON::Any.new(hours)
+    activity["hourly_activity"] = JSON::Any.new(hourly_activity)
     activity["peak_hour"] = JSON::Any.new(peak_hour)
     activity["avg_hourly"] = JSON::Any.new(avg_hourly)
     activity["total_activity"] = JSON::Any.new(hours.sum)
