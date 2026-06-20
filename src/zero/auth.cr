@@ -112,16 +112,16 @@ module Auth
     end
     
     # Verify password
-    password_hash = user["password_hash"].to_s
+    password_hash = user["password_hash"].as_s
     if !verify_password(password, password_hash)
       return {false, "Invalid username or password"}
     end
     
     # Update last login
-    UserDB.update_last_login(user["id"].to_i64)
+    UserDB.update_last_login(user["id"].as_i64)
     
     # Generate token
-    token = generate_token(user["id"].to_i64, user["username"].to_s)
+    token = generate_token(user["id"].as_i64, user["username"].as_s)
     
     # Return user data without password hash
     user_data = {
@@ -130,7 +130,7 @@ module Auth
       "email"      => user["email"],
       "created_at" => user["created_at"],
       "is_admin"   => user["is_admin"],
-      "token"      => token
+      "token"      => JSON::Any.new(token)
     }
     
     {true, user_data}
@@ -280,7 +280,7 @@ module Auth
       return {false, "Invalid email address"}
     end
     
-    if UserDB.email_exists?(new_email) && UserDB.find_by_email(new_email)["id"] != user_id
+    if UserDB.email_exists?(new_email) && UserDB.find_by_email(new_email)["id"].as_i64 != user_id
       return {false, "Email already in use"}
     end
     
@@ -321,7 +321,7 @@ module Auth
   # Check if user is admin
   def self.is_admin?(user_id : Int64) : Bool
     user = UserDB.find(user_id)
-    user ? user["is_admin"].to_bool : false
+    user ? user["is_admin"].as_bool : false
   end
 
   # Require authentication middleware
@@ -386,6 +386,6 @@ module AuthHelpers
   # Check if user is admin
   def self.admin?(context : HTTP::Server::Context) : Bool
     user = current_user(context)
-    user ? user["is_admin"].to_bool : false
+    user ? user["is_admin"].as_bool : false
   end
 end
