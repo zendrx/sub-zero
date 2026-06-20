@@ -1,5 +1,5 @@
 # auth.cr - Authentication module for Crystal Aggregator
-
+require "json"
 require "crypto/bcrypt/password"
 require "jwt"
 require "time"
