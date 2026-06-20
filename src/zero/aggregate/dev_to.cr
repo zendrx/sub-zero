@@ -21,7 +21,7 @@ module DevToFetcher
   POPULAR_TAGS = ["ruby", "javascript", "python", "react", "rails", "go", "rust", "devops", "cloud", "ai", "machinelearning", "webdev"]
   
   # Fetches articles with optional filters
-  def self.fetch_articles(params : Hash(String, String | Int32 | Nil) = {} of String => String | Int32 | Nil) : Array(Hash(String, JSON::Type))
+  def self.fetch_articles(params : Hash(String, String | Int32 | Nil) = {} of String => String | Int32 | Nil) : Array(Hash(String, JSON::Any))
     # Build query string
     query = [] of String
     params.each do |key, value|
@@ -48,22 +48,22 @@ module DevToFetcher
         parse_articles_response(response.body)
       else
         puts "Failed to fetch articles: #{response.status_code}"
-        [] of Hash(String, JSON::Type)
+        [] of Hash(String, JSON::Any)
       end
     else
       puts "Failed to fetch articles: #{response.status_code}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
     puts "Error fetching articles: #{e.message}"
-    [] of Hash(String, JSON::Type)
+    [] of Hash(String, JSON::Any)
   end
   
   # Parses the JSON response from Dev.to
-  def self.parse_articles_response(body : String) : Array(Hash(String, JSON::Type))
+  def self.parse_articles_response(body : String) : Array(Hash(String, JSON::Any))
     begin
       data = JSON.parse(body)
-      articles = [] of Hash(String, JSON::Type)
+      articles = [] of Hash(String, JSON::Any)
       
       data.as_a.each do |article|
         # Extract article information
@@ -90,24 +90,23 @@ module DevToFetcher
         content = description
         tags = tag_list.split(",").map(&.strip).join(", ")
         
-        # Build the article hash
-        article_data = {
-          "title"                  => title,
-          "url"                    => url,
-          "content"                => content,
-          "cover_image"            => cover_image,
-          "source"                 => "devto",
-          "external_id"            => external_id,
-          "score"                  => positive_reactions_count,
-          "comment_count"          => comments_count,
-          "is_user_post"           => false,
-          "published_at"           => published_at,
-          "tags"                   => tags,
-          "author_name"            => user_name,
-          "author_username"        => user_username,
-          "reading_time"           => reading_time_minutes,
-          "org_name"               => org_name
-        }
+        # Build the article hash using JSON::Any
+        article_data = Hash(String, JSON::Any).new
+        article_data["title"] = JSON::Any.new(title)
+        article_data["url"] = JSON::Any.new(url)
+        article_data["content"] = JSON::Any.new(content)
+        article_data["cover_image"] = JSON::Any.new(cover_image)
+        article_data["source"] = JSON::Any.new("devto")
+        article_data["external_id"] = JSON::Any.new(external_id)
+        article_data["score"] = JSON::Any.new(positive_reactions_count)
+        article_data["comment_count"] = JSON::Any.new(comments_count)
+        article_data["is_user_post"] = JSON::Any.new(false)
+        article_data["published_at"] = JSON::Any.new(published_at)
+        article_data["tags"] = JSON::Any.new(tags)
+        article_data["author_name"] = JSON::Any.new(user_name)
+        article_data["author_username"] = JSON::Any.new(user_username)
+        article_data["reading_time"] = JSON::Any.new(reading_time_minutes)
+        article_data["org_name"] = JSON::Any.new(org_name)
         
         articles << article_data
       end
@@ -115,12 +114,12 @@ module DevToFetcher
       articles
     rescue e : JSON::ParseException
       puts "Failed to parse JSON: #{e.message}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   end
   
   # Saves fetched articles to the database, skipping duplicates
-  def self.save_articles_to_db(articles : Array(Hash(String, JSON::Type))) : Int32
+  def self.save_articles_to_db(articles : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
     
     articles.each do |article|
@@ -128,12 +127,12 @@ module DevToFetcher
       next if external_id.empty?
       
       # Check if article already exists
-      result = POOL.exec(
+      result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'devto'",
         external_id
       )
       
-      if result.rows.empty?
+      if !result.move_next
         # Insert new article
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
@@ -307,7 +306,7 @@ module DevToFetcher
   end
   
   # Fetches a single article by ID
-  def self.fetch_article_by_id(id : Int64) : Hash(String, JSON::Type)?
+  def self.fetch_article_by_id(id : Int64) : Hash(String, JSON::Any)?
     url = "#{BASE_URL}/articles/#{id}"
     headers = HTTP::Headers{"User-Agent" => "CrystalAggregator/1.0"}
     
@@ -317,16 +316,17 @@ module DevToFetcher
       begin
         data = JSON.parse(response.body)
         
-        {
-          "title"          => data["title"]?.to_s || "Untitled",
-          "url"            => data["url"]?.to_s || "",
-          "content"        => data["body_html"]?.to_s || data["description"]?.to_s || "",
-          "source"         => "devto",
-          "external_id"    => data["id"]?.to_i64.to_s,
-          "score"          => data["positive_reactions_count"]?.to_i || 0,
-          "comment_count"  => data["comments_count"]?.to_i || 0,
-          "is_user_post"   => false
-        }
+        article = Hash(String, JSON::Any).new
+        article["title"] = JSON::Any.new(data["title"]?.to_s || "Untitled")
+        article["url"] = JSON::Any.new(data["url"]?.to_s || "")
+        article["content"] = JSON::Any.new(data["body_html"]?.to_s || data["description"]?.to_s || "")
+        article["source"] = JSON::Any.new("devto")
+        article["external_id"] = JSON::Any.new(data["id"]?.to_i64.to_s)
+        article["score"] = JSON::Any.new(data["positive_reactions_count"]?.to_i || 0)
+        article["comment_count"] = JSON::Any.new(data["comments_count"]?.to_i || 0)
+        article["is_user_post"] = JSON::Any.new(false)
+        
+        article
       rescue e : Exception
         puts "Failed to parse article #{id}: #{e.message}"
         nil
@@ -341,7 +341,7 @@ module DevToFetcher
   end
   
   # Search articles by query
-  def self.search_articles(query : String, limit : Int32 = DEFAULT_LIMIT) : Array(Hash(String, JSON::Type))
+  def self.search_articles(query : String, limit : Int32 = DEFAULT_LIMIT) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/articles?search=#{URI.encode_path(query)}&per_page=#{limit}"
     headers = HTTP::Headers{"User-Agent" => "CrystalAggregator/1.0"}
     
@@ -351,10 +351,10 @@ module DevToFetcher
       parse_articles_response(response.body)
     else
       puts "Search failed: #{response.status_code}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
     puts "Error searching articles: #{e.message}"
-    [] of Hash(String, JSON::Type)
+    [] of Hash(String, JSON::Any)
   end
 end
