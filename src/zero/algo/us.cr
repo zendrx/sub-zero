@@ -11,16 +11,29 @@ module UserAlgorithms
     upvote_weight = 2.0
     comment_weight = 3.0
     save_weight = 1.5
-    share_weight = 4.0
-    view_weight = 0.5
     
     score = 0.0
-    score += stats["upvotes"]?.try &.as_i64.to_f * upvote_weight if stats["upvotes"]?
-    score += stats["comments"]?.try &.as_i64.to_f * comment_weight if stats["comments"]?
-    score += stats["saves"]?.try &.as_i64.to_f * save_weight if stats["saves"]?
     
-    sources = stats["sources_used"]?.try &.as_i64.to_f || 0.0
-    score += Math.log([sources, 1.0].max) * 2.0
+    # Handle nil values properly using `try` with `as_i64` and then `to_f`
+    upvotes = stats["upvotes"]?.try &.as_i64
+    if upvotes
+      score += upvotes.to_f * upvote_weight
+    end
+    
+    comments = stats["comments"]?.try &.as_i64
+    if comments
+      score += comments.to_f * comment_weight
+    end
+    
+    saves = stats["saves"]?.try &.as_i64
+    if saves
+      score += saves.to_f * save_weight
+    end
+    
+    sources = stats["sources_used"]?.try &.as_i64
+    if sources
+      score += Math.log([sources.to_f, 1.0].max) * 2.0
+    end
     
     score
   end
@@ -53,10 +66,6 @@ module UserAlgorithms
     end
     tag_score = tag_score / [tags.size, 1].max
     interest += Math.tanh(tag_score / 10.0) * 0.3
-    
-    created_at = Time.utc
-    hours = 0.0
-    interest += 0.15
     
     sources_used = AlgoDB.get_user_source_preferences(user_id).size
     if sources_used > 0
@@ -92,7 +101,6 @@ module UserAlgorithms
     peak_hour = hours.index(hours.max) || 0
     avg_hourly = hours.sum.to_f / hours.size
     
-    # Convert Array(Int32) to Array(JSON::Any) for JSON serialization
     hourly_activity = hours.map { |h| JSON::Any.new(h) }
     
     activity = Hash(String, JSON::Any).new
