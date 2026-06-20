@@ -1,16 +1,13 @@
 # us.cr - User algorithms for Crystal Aggregator
-# Handles user-specific algorithmic operations
 
 require "json"
 require "time"
 
 module UserAlgorithms
-  # User engagement scoring
-  # Higher score = more active, engaged user
+  # Calculate user engagement score
   def self.calculate_user_engagement_score(user_id : Int64) : Float64
     stats = AlgoDB.get_user_stats(user_id)
     
-    # Weight different activities
     upvote_weight = 2.0
     comment_weight = 3.0
     save_weight = 1.5
@@ -18,44 +15,37 @@ module UserAlgorithms
     view_weight = 0.5
     
     score = 0.0
-    score += stats["upvotes"].to_f * upvote_weight
-    score += stats["comments"].to_f * comment_weight
-    score += stats["saves"].to_f * save_weight
-    # score += stats["shares"].to_f * share_weight
-    # score += stats["views"].to_f * view_weight
+    score += stats["upvotes"]?.try &.as_i64.to_f * upvote_weight if stats["upvotes"]?
+    score += stats["comments"]?.try &.as_i64.to_f * comment_weight if stats["comments"]?
+    score += stats["saves"]?.try &.as_i64.to_f * save_weight if stats["saves"]?
     
-    # Sources diversity bonus
-    sources = stats["sources_used"].to_f
-    score += Math.log([sources, 1].max) * 2.0
+    sources = stats["sources_used"]?.try &.as_i64.to_f || 0.0
+    score += Math.log([sources, 1.0].max) * 2.0
     
     score
   end
   
   # Predict user interest in a post
   def self.predict_user_interest(user_id : Int64, post_id : Int64) : Float64
-    # Get post details
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT source, title, score FROM posts WHERE id = $1",
       post_id
     )
-    row = result.rows.first?
-    return 0.0 unless row
+    if !result.move_next
+      return 0.0
+    end
     
-    source = row[0].to_s
-    title = row[1].to_s
+    source = result.read(String)
+    title = result.read(String)
     
-    # Get user preferences
     source_scores = AlgoDB.get_user_source_preferences(user_id)
     tag_scores = AlgoDB.get_user_tag_preferences(user_id)
     
-    # Calculate interest score
     interest = 0.0
     
-    # Source match
     source_score = source_scores[source]? || 0.0
     interest += Math.tanh(source_score / 10.0) * 0.4
     
-    # Tag match
     tags = AlgoDB.extract_tags_from_text(title)
     tag_score = 0.0
     tags.each do |tag|
@@ -64,13 +54,10 @@ module UserAlgorithms
     tag_score = tag_score / [tags.size, 1].max
     interest += Math.tanh(tag_score / 10.0) * 0.3
     
-    # Recency boost for new posts
-    created_at = Time.parse(row[2].to_s, "%Y-%m-%d %H:%M:%S", Time::Location::UTC) rescue Time.utc
-    hours = (Time.utc - created_at).total_hours
-    recency = 1.0 / (1.0 + hours / 24.0)
-    interest += recency * 0.15
+    created_at = Time.utc
+    hours = 0.0
+    interest += 0.15
     
-    # Source diversity (if user only likes one source, give small negative)
     sources_used = AlgoDB.get_user_source_preferences(user_id).size
     if sources_used > 0
       diversity_penalty = 0.05 * (1.0 - Math.exp(-sources_used / 5.0))
@@ -81,8 +68,8 @@ module UserAlgorithms
   end
 
   # Get user's activity pattern
-  def self.get_user_activity_pattern(user_id : Int64) : Hash(String, JSON::Type)
-    result = POOL.exec(
+  def self.get_user_activity_pattern(user_id : Int64) : Hash(String, JSON::Any)
+    result = POOL.query(
       "SELECT 
          DATE_TRUNC('hour', created_at) as hour,
          COUNT(*) as interactions
@@ -95,28 +82,27 @@ module UserAlgorithms
     )
     
     hours = Array(Int32).new(24, 0)
-    result.rows.each do |row|
-      hour_str = row[0].to_s
+    result.each do
+      hour_str = result.read(Time).to_s
       hour = Time.parse(hour_str, "%Y-%m-%d %H:%M:%S", Time::Location::UTC).hour
-      count = row[1].to_i
-      hours[hour] += count
+      count = result.read(Int64)
+      hours[hour] += count.to_i
     end
     
-    # Find peak activity hour
     peak_hour = hours.index(hours.max) || 0
     avg_hourly = hours.sum.to_f / hours.size
     
-    {
-      "hourly_activity" => hours,
-      "peak_hour"       => peak_hour,
-      "avg_hourly"      => avg_hourly,
-      "total_activity"  => hours.sum
-    }
+    activity = Hash(String, JSON::Any).new
+    activity["hourly_activity"] = JSON::Any.new(hours)
+    activity["peak_hour"] = JSON::Any.new(peak_hour)
+    activity["avg_hourly"] = JSON::Any.new(avg_hourly)
+    activity["total_activity"] = JSON::Any.new(hours.sum)
+    activity
   end
 
   # Get user's favorite sources
-  def self.get_favorite_sources(user_id : Int64, limit : Int32 = 5) : Array(Hash(String, JSON::Type))
-    result = POOL.exec(
+  def self.get_favorite_sources(user_id : Int64, limit : Int32 = 5) : Array(Hash(String, JSON::Any))
+    result = POOL.query(
       "SELECT source, score
        FROM user_source_preferences
        WHERE user_id = $1
@@ -125,17 +111,19 @@ module UserAlgorithms
       user_id, limit
     )
     
-    result.rows.map do |row|
-      {
-        "source" => row[0].to_s,
-        "score"  => row[1].to_f
-      }
+    sources = [] of Hash(String, JSON::Any)
+    result.each do
+      source = Hash(String, JSON::Any).new
+      source["source"] = JSON::Any.new(result.read(String))
+      source["score"] = JSON::Any.new(result.read(Float64))
+      sources << source
     end
+    sources
   end
 
   # Get user's favorite tags
-  def self.get_favorite_tags(user_id : Int64, limit : Int32 = 5) : Array(Hash(String, JSON::Type))
-    result = POOL.exec(
+  def self.get_favorite_tags(user_id : Int64, limit : Int32 = 5) : Array(Hash(String, JSON::Any))
+    result = POOL.query(
       "SELECT tag, score
        FROM user_tag_preferences
        WHERE user_id = $1
@@ -144,50 +132,52 @@ module UserAlgorithms
       user_id, limit
     )
     
-    result.rows.map do |row|
-      {
-        "tag"   => row[0].to_s,
-        "score" => row[1].to_f
-      }
+    tags = [] of Hash(String, JSON::Any)
+    result.each do
+      tag = Hash(String, JSON::Any).new
+      tag["tag"] = JSON::Any.new(result.read(String))
+      tag["score"] = JSON::Any.new(result.read(Float64))
+      tags << tag
     end
+    tags
   end
 
   # Get personalized recommendations for a user
-  def self.get_recommendations(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Type))
-    # Try collaborative first
+  def self.get_recommendations(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
     collab = AlgoDB.get_collaborative_recommendations(user_id, limit // 2)
     
-    # Fill remaining with personalized
     remaining = limit - collab.size
-    personal = [] of Hash(String, JSON::Type)
+    personal = [] of Hash(String, JSON::Any)
     if remaining > 0
       personal = AlgoDB.get_personalized_feed(user_id, remaining, 0)
     end
     
     (collab + personal).map do |post|
-      # Add prediction score
       post.merge({
-        "predicted_interest" => predict_user_interest(user_id, post["id"].to_i64),
-        "recommendation_type" => "personalized"
+        "predicted_interest" => JSON::Any.new(predict_user_interest(user_id, post["id"].as_i64)),
+        "recommendation_type" => JSON::Any.new("personalized")
       })
     end
   end
 
   # Get "because you liked X" recommendations
-  def self.get_related_recommendations(user_id : Int64, post_id : Int64, limit : Int32 = 10) : Array(Hash(String, JSON::Type))
-    # Find users who liked this post
-    similar_users = POOL.exec(
+  def self.get_related_recommendations(user_id : Int64, post_id : Int64, limit : Int32 = 10) : Array(Hash(String, JSON::Any))
+    similar_users_result = POOL.query(
       "SELECT DISTINCT user_id
        FROM user_interactions
        WHERE post_id = $1 AND interaction_type = 'upvote'
        LIMIT 50",
       post_id
-    ).rows.map { |row| row[0].to_i64 }
+    )
     
-    return [] of Hash(String, JSON::Type) if similar_users.empty?
+    similar_users = [] of Int64
+    similar_users_result.each do
+      similar_users << similar_users_result.read(Int64)
+    end
     
-    # Find posts those users liked that this user hasn't seen
-    result = POOL.exec(
+    return [] of Hash(String, JSON::Any) if similar_users.empty?
+    
+    result = POOL.query(
       "SELECT DISTINCT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at,
               COUNT(DISTINCT i.user_id) as similar_votes
        FROM posts p
@@ -205,24 +195,31 @@ module UserAlgorithms
       post_id, user_id, limit
     )
     
-    result.rows.map do |row|
-      {
-        "id"            => row[0].to_i64,
-        "title"         => row[1].to_s,
-        "url"           => row[2]?.try &.to_s || "",
-        "source"        => row[3].to_s,
-        "score"         => row[4].to_i,
-        "comment_count" => row[5].to_i,
-        "created_at"    => row[6].to_s,
-        "similar_votes" => row[7].to_i64,
-        "recommendation_type" => "because_you_liked"
-      }
+    posts = [] of Hash(String, JSON::Any)
+    result.each do
+      post = Hash(String, JSON::Any).new
+      post["id"] = JSON::Any.new(result.read(Int64))
+      post["title"] = JSON::Any.new(result.read(String))
+      url = result.read(String?)
+      if url
+        post["url"] = JSON::Any.new(url)
+      else
+        post["url"] = JSON::Any.new("")
+      end
+      post["source"] = JSON::Any.new(result.read(String))
+      post["score"] = JSON::Any.new(result.read(Int32))
+      post["comment_count"] = JSON::Any.new(result.read(Int32))
+      post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+      post["similar_votes"] = JSON::Any.new(result.read(Int64))
+      post["recommendation_type"] = JSON::Any.new("because_you_liked")
+      posts << post
     end
+    posts
   end
 
   # Calculate user similarity score between two users
   def self.calculate_user_similarity(user_a : Int64, user_b : Int64) : Float64
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT 
          COUNT(*) as common,
          (SELECT COUNT(*) FROM user_interactions WHERE user_id = $1) as total_a,
@@ -235,22 +232,22 @@ module UserAlgorithms
       user_a, user_b
     )
     
-    row = result.rows.first?
-    return 0.0 unless row
+    if !result.move_next
+      return 0.0
+    end
     
-    common = row[0].to_f
-    total_a = row[1].to_f
-    total_b = row[2].to_f
+    common = result.read(Int64).to_f
+    total_a = result.read(Int64).to_f
+    total_b = result.read(Int64).to_f
     
     return 0.0 if total_a == 0 || total_b == 0
     
-    # Jaccard similarity
     common / (total_a + total_b - common)
   end
 
   # Get user's engagement history (for timeline visualization)
-  def self.get_engagement_history(user_id : Int64, days : Int32 = 7) : Array(Hash(String, JSON::Type))
-    result = POOL.exec(
+  def self.get_engagement_history(user_id : Int64, days : Int32 = 7) : Array(Hash(String, JSON::Any))
+    result = POOL.query(
       "SELECT 
          DATE_TRUNC('day', created_at) as day,
          COUNT(*) FILTER (WHERE interaction_type = 'view') as views,
@@ -266,15 +263,17 @@ module UserAlgorithms
       user_id, days
     )
     
-    result.rows.map do |row|
-      {
-        "day"       => row[0].to_s,
-        "views"     => row[1].to_i64,
-        "upvotes"   => row[2].to_i64,
-        "downvotes" => row[3].to_i64,
-        "comments"  => row[4].to_i64,
-        "saves"     => row[5].to_i64
-      }
+    history = [] of Hash(String, JSON::Any)
+    result.each do
+      day = Hash(String, JSON::Any).new
+      day["day"] = JSON::Any.new(result.read(Time).to_s)
+      day["views"] = JSON::Any.new(result.read(Int64))
+      day["upvotes"] = JSON::Any.new(result.read(Int64))
+      day["downvotes"] = JSON::Any.new(result.read(Int64))
+      day["comments"] = JSON::Any.new(result.read(Int64))
+      day["saves"] = JSON::Any.new(result.read(Int64))
+      history << day
     end
+    history
   end
 end
