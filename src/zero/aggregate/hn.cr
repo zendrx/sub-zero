@@ -38,7 +38,7 @@ module HNFetcher
   end
   
   # Fetches a single story by ID
-  def self.fetch_story(id : Int64) : Hash(String, JSON::Type)?
+  def self.fetch_story(id : Int64) : Hash(String, JSON::Any)?
     url = "#{BASE_URL}/item/#{id}.json"
     
     response = HTTP::Client.get(url)
@@ -65,21 +65,22 @@ module HNFetcher
         is_self = text.empty? ? false : true
         content = is_self ? text : ""
         
-        # Return as hash
-        {
-          "title"          => title,
-          "url"            => url,
-          "content"        => content,
-          "source"         => "hackernews",
-          "external_id"    => external_id,
-          "score"          => score,
-          "comment_count"  => comment_count,
-          "is_self"        => is_self,
-          "author"         => by,
-          "created_utc"    => time,
-          "story_type"     => story_type,
-          "is_user_post"   => false
-        }
+        # Build story hash using JSON::Any
+        story = Hash(String, JSON::Any).new
+        story["title"] = JSON::Any.new(title)
+        story["url"] = JSON::Any.new(url)
+        story["content"] = JSON::Any.new(content)
+        story["source"] = JSON::Any.new("hackernews")
+        story["external_id"] = JSON::Any.new(external_id)
+        story["score"] = JSON::Any.new(score)
+        story["comment_count"] = JSON::Any.new(comment_count)
+        story["is_self"] = JSON::Any.new(is_self)
+        story["author"] = JSON::Any.new(by)
+        story["created_utc"] = JSON::Any.new(time)
+        story["story_type"] = JSON::Any.new(story_type)
+        story["is_user_post"] = JSON::Any.new(false)
+        
+        story
       rescue e : Exception
         puts "Failed to parse story #{id}: #{e.message}"
         nil
@@ -94,11 +95,11 @@ module HNFetcher
   end
   
   # Fetches multiple stories by IDs
-  def self.fetch_stories(ids : Array(Int64)) : Array(Hash(String, JSON::Type))
-    stories = [] of Hash(String, JSON::Type)
+  def self.fetch_stories(ids : Array(Int64)) : Array(Hash(String, JSON::Any))
+    stories = [] of Hash(String, JSON::Any)
     
     # Use fibers for concurrent fetching
-    channels = ids.map { Channel(Hash(String, JSON::Type)?).new }
+    channels = ids.map { Channel(Hash(String, JSON::Any)?).new }
     
     ids.each_with_index do |id, index|
       spawn do
@@ -122,7 +123,7 @@ module HNFetcher
   end
   
   # Saves fetched stories to the database, skipping duplicates
-  def self.save_stories_to_db(stories : Array(Hash(String, JSON::Type))) : Int32
+  def self.save_stories_to_db(stories : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
     
     stories.each do |story|
@@ -130,12 +131,12 @@ module HNFetcher
       next if external_id.empty?
       
       # Check if story already exists
-      result = POOL.exec(
+      result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'hackernews'",
         external_id
       )
       
-      if result.rows.empty?
+      if !result.move_next
         # Insert new story
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
@@ -251,7 +252,7 @@ module HNFetcher
   end
   
   # Fetches comments for a specific story
-  def self.fetch_story_comments(story_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Type))
+  def self.fetch_story_comments(story_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/item/#{story_id}.json"
     
     response = HTTP::Client.get(url)
@@ -259,7 +260,7 @@ module HNFetcher
     if response.status_code == 200
       begin
         data = JSON.parse(response.body)
-        comments = [] of Hash(String, JSON::Type)
+        comments = [] of Hash(String, JSON::Any)
         
         if kids = data["kids"]?
           kids.as_a.first(limit).each do |kid|
@@ -271,19 +272,19 @@ module HNFetcher
         comments
       rescue e : Exception
         puts "Failed to fetch story comments: #{e.message}"
-        [] of Hash(String, JSON::Type)
+        [] of Hash(String, JSON::Any)
       end
     else
       puts "Failed to fetch story comments: #{response.status_code}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
     puts "Error fetching story comments: #{e.message}"
-    [] of Hash(String, JSON::Type)
+    [] of Hash(String, JSON::Any)
   end
   
   # Fetches a single comment by ID
-  def self.fetch_comment(id : Int64) : Hash(String, JSON::Type)?
+  def self.fetch_comment(id : Int64) : Hash(String, JSON::Any)?
     url = "#{BASE_URL}/item/#{id}.json"
     
     response = HTTP::Client.get(url)
@@ -294,13 +295,14 @@ module HNFetcher
         
         return nil if data["type"]?.to_s != "comment"
         
-        {
-          "id"         => data["id"]?.to_i64 || 0,
-          "by"         => data["by"]?.to_s || "",
-          "text"       => data["text"]?.to_s || "",
-          "time"       => data["time"]?.to_i || 0,
-          "parent"     => data["parent"]?.to_i64 || 0
-        }
+        comment = Hash(String, JSON::Any).new
+        comment["id"] = JSON::Any.new(data["id"]?.to_i64 || 0)
+        comment["by"] = JSON::Any.new(data["by"]?.to_s || "")
+        comment["text"] = JSON::Any.new(data["text"]?.to_s || "")
+        comment["time"] = JSON::Any.new(data["time"]?.to_i || 0)
+        comment["parent"] = JSON::Any.new(data["parent"]?.to_i64 || 0)
+        
+        comment
       rescue e : Exception
         puts "Failed to parse comment #{id}: #{e.message}"
         nil
