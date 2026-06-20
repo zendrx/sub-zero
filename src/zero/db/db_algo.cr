@@ -1,136 +1,68 @@
-# db_algo.cr - Algorithm database layer for Crystal Aggregator
+# rec.cr - Recommendation engine for Crystal Aggregator
 
-require "pg"
 require "json"
-require "time"
 
-module AlgoDB
-  # Record a user interaction with a post
-  def self.record_interaction(user_id : Int64, post_id : Int64, interaction_type : String, weight : Float64 = 1.0)
-    POOL.exec(
-      "INSERT INTO user_interactions (user_id, post_id, interaction_type, weight, created_at)
-       VALUES ($1, $2, $3, $4, NOW())",
-      user_id, post_id, interaction_type, weight
-    )
-    
-    update_user_preferences(user_id, post_id, interaction_type, weight)
-  rescue e : PG::Error
-    puts "Failed to record interaction: #{e.message}"
+module RecommendationEngine
+  # Feed types
+  enum FeedType
+    Hot
+    New
+    Top
+    Personalized
+    Trending
+    Discovery
+    Collaborative
+    Mixed
   end
-  
-  # Update user preferences based on an interaction
-  def self.update_user_preferences(user_id : Int64, post_id : Int64, interaction_type : String, weight : Float64 = 1.0)
-    result = POOL.query(
-      "SELECT source, title FROM posts WHERE id = $1",
-      post_id
-    )
-    if !result.move_next
-      return
-    end
-    
-    source = result.read(String)
-    title = result.read(String)
-    
-    interaction_weights = {
-      "upvote"   => 2.0,
-      "comment"  => 1.5,
-      "save"     => 1.5,
-      "share"    => 2.5,
-      "view"     => 0.5,
-      "click"    => 0.8,
-      "downvote" => -1.0
-    }
-    
-    effective_weight = weight * (interaction_weights[interaction_type]? || 0.5)
-    
-    POOL.exec(
-      "INSERT INTO user_source_preferences (user_id, source, score, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (user_id, source) DO UPDATE
-       SET score = user_source_preferences.score + $3,
-           updated_at = NOW()",
-      user_id, source, effective_weight
-    )
-    
-    tags = extract_tags_from_text(title)
-    tags.each do |tag|
-      POOL.exec(
-        "INSERT INTO user_tag_preferences (user_id, tag, score, updated_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (user_id, tag) DO UPDATE
-         SET score = user_tag_preferences.score + $3,
-             updated_at = NOW()",
-        user_id, tag, effective_weight * 0.5
-      )
-    end
-  end
-  
-  # Extract simple tags from text
-  def self.extract_tags_from_text(text : String) : Array(String)
-    tags = [] of String
-    text = text.downcase
-    
-    common_tags = ["ruby", "python", "javascript", "react", "rails", "go", "rust", 
-                   "devops", "cloud", "ai", "machinelearning", "webdev", "security",
-                   "database", "api", "microservices", "kubernetes", "docker", "linux",
-                   "vim", "emacs", "vscode", "git", "github", "opensource", "startup"]
-    
-    common_tags.each do |tag|
-      if text.includes?(tag)
-        tags << tag
+
+  # Get feed based on type
+  def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
+                    limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
+    case feed_type
+    when FeedType::Hot
+      get_hot_feed(limit, offset)
+    when FeedType::New
+      get_new_feed(limit, offset)
+    when FeedType::Top
+      get_top_feed(limit, offset)
+    when FeedType::Personalized
+      if user_id
+        get_personalized_feed(user_id, limit, offset) || [] of Hash(String, JSON::Any)
+      else
+        get_hot_feed(limit, offset)
+      end
+    when FeedType::Trending
+      get_trending_feed(limit) || [] of Hash(String, JSON::Any)
+    when FeedType::Discovery
+      if user_id
+        get_discovery_feed(user_id, limit) || [] of Hash(String, JSON::Any)
+      else
+        get_hot_feed(limit, offset)
+      end
+    when FeedType::Collaborative
+      if user_id
+        get_collaborative_feed(user_id, limit) || [] of Hash(String, JSON::Any)
+      else
+        get_hot_feed(limit, offset)
+      end
+    when FeedType::Mixed
+      if user_id
+        get_mixed_feed(user_id, limit) || [] of Hash(String, JSON::Any)
+      else
+        get_hot_feed(limit, offset)
       end
     end
-    
-    tags
   end
-  
-  # Calculate hot score for a post
-  def self.calculate_hot_score(upvotes : Int32, downvotes : Int32, created_at : Time) : Float64
-    score = upvotes - downvotes
-    hours = (Time.utc - created_at).total_hours
-    Math.log([score, 1].max) + (hours / 45000.0)
-  end
-  
-  # Get user's source preferences
-  def self.get_user_source_preferences(user_id : Int64) : Hash(String, Float64)
-    preferences = {} of String => Float64
+
+  # Hot feed - Reddit-style time decay
+  def self.get_hot_feed(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
-      "SELECT source, score FROM user_source_preferences WHERE user_id = $1",
-      user_id
-    )
-    result.each do
-      preferences[result.read(String)] = result.read(Float64)
-    end
-    preferences
-  end
-  
-  # Get user's tag preferences
-  def self.get_user_tag_preferences(user_id : Int64) : Hash(String, Float64)
-    preferences = {} of String => Float64
-    result = POOL.query(
-      "SELECT tag, score FROM user_tag_preferences WHERE user_id = $1",
-      user_id
-    )
-    result.each do
-      preferences[result.read(String)] = result.read(Float64)
-    end
-    preferences
-  end
-  
-  # Get trending posts based on recent engagement spikes
-  def self.get_trending_posts(limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    result = POOL.query(
-      "SELECT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at,
-              COUNT(i.id) as recent_interactions
-       FROM posts p
-       LEFT JOIN user_interactions i ON p.id = i.post_id 
-         AND i.created_at > NOW() - INTERVAL '1 hour'
-       WHERE p.created_at > NOW() - INTERVAL '7 days'
-       GROUP BY p.id
-       HAVING COUNT(i.id) > 3
-       ORDER BY recent_interactions DESC, p.score DESC
-       LIMIT $1",
-      limit
+      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+       FROM posts
+       WHERE is_user_post = false
+       ORDER BY (LOG(GREATEST(score, 1)) + (EXTRACT(EPOCH FROM created_at) / 45000)) DESC
+       LIMIT $1 OFFSET $2",
+      limit, offset
     )
     
     posts = [] of Hash(String, JSON::Any)
@@ -148,28 +80,23 @@ module AlgoDB
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
-      post["recent_engagement"] = JSON::Any.new(result.read(Int64))
+      post["upvotes"] = JSON::Any.new(result.read(Int32))
+      post["downvotes"] = JSON::Any.new(result.read(Int32))
+      post["feed_type"] = JSON::Any.new("hot")
       posts << post
     end
     posts
   end
-  
-  # Get posts from sources a user hasn't seen much of
-  def self.get_discovery_posts(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
+
+  # New feed - most recent first
+  def self.get_new_feed(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
-      "SELECT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at
-       FROM posts p
-       WHERE p.source NOT IN (
-         SELECT source FROM user_source_preferences 
-         WHERE user_id = $1 AND score > 0.5
-       )
-       AND p.id NOT IN (
-         SELECT post_id FROM user_interactions WHERE user_id = $1
-       )
-       AND p.is_user_post = false
-       ORDER BY p.score DESC
-       LIMIT $2",
-      user_id, limit
+      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+       FROM posts
+       WHERE is_user_post = false
+       ORDER BY created_at DESC
+       LIMIT $1 OFFSET $2",
+      limit, offset
     )
     
     posts = [] of Hash(String, JSON::Any)
@@ -187,34 +114,66 @@ module AlgoDB
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+      post["upvotes"] = JSON::Any.new(result.read(Int32))
+      post["downvotes"] = JSON::Any.new(result.read(Int32))
+      post["feed_type"] = JSON::Any.new("new")
       posts << post
     end
     posts
   end
-  
-  # Get collaborative recommendations
-  def self.get_collaborative_recommendations(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    similar_users = find_similar_users(user_id, 10)
-    return [] of Hash(String, JSON::Any) if similar_users.empty?
+
+  # Top feed - highest scoring posts
+  def self.get_top_feed(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
+    result = POOL.query(
+      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+       FROM posts
+       WHERE is_user_post = false
+       ORDER BY score DESC
+       LIMIT $1 OFFSET $2",
+      limit, offset
+    )
+    
+    posts = [] of Hash(String, JSON::Any)
+    result.each do
+      post = Hash(String, JSON::Any).new
+      post["id"] = JSON::Any.new(result.read(Int64))
+      post["title"] = JSON::Any.new(result.read(String))
+      url = result.read(String?)
+      if url
+        post["url"] = JSON::Any.new(url)
+      else
+        post["url"] = JSON::Any.new("")
+      end
+      post["source"] = JSON::Any.new(result.read(String))
+      post["score"] = JSON::Any.new(result.read(Int32))
+      post["comment_count"] = JSON::Any.new(result.read(Int32))
+      post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+      post["upvotes"] = JSON::Any.new(result.read(Int32))
+      post["downvotes"] = JSON::Any.new(result.read(Int32))
+      post["feed_type"] = JSON::Any.new("top")
+      posts << post
+    end
+    posts
+  end
+
+  # Personalized feed - based on user preferences
+  def self.get_personalized_feed(user_id : Int64, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
+    source_scores = AlgoDB.get_user_source_preferences(user_id)
+    tag_scores = AlgoDB.get_user_tag_preferences(user_id)
     
     result = POOL.query(
-      "SELECT DISTINCT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at,
-              COUNT(DISTINCT i.user_id) as similar_user_votes
-       FROM posts p
-       JOIN user_interactions i ON p.id = i.post_id
-       WHERE i.user_id IN (#{similar_users.join(",")})
-         AND i.interaction_type = 'upvote'
-         AND p.id NOT IN (
+      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+       FROM posts
+       WHERE is_user_post = false
+         AND id NOT IN (
            SELECT post_id FROM user_interactions WHERE user_id = $1
          )
-         AND p.is_user_post = false
-       GROUP BY p.id
-       ORDER BY similar_user_votes DESC, p.score DESC
-       LIMIT $2",
-      user_id, limit
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3",
+      user_id, limit * 2, offset
     )
     
-    posts = [] of Hash(String, JSON::Any)
+    scored_posts = [] of Tuple(Float64, Hash(String, JSON::Any))
     result.each do
       post = Hash(String, JSON::Any).new
       post["id"] = JSON::Any.new(result.read(Int64))
@@ -229,103 +188,78 @@ module AlgoDB
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
-      post["similar_votes"] = JSON::Any.new(result.read(Int64))
-      posts << post
+      post["upvotes"] = JSON::Any.new(result.read(Int32))
+      post["downvotes"] = JSON::Any.new(result.read(Int32))
+      
+      score = calculate_personalized_score(post, source_scores, tag_scores)
+      scored_posts << {score, post}
     end
-    posts
-  end
-  
-  # Find similar users based on voting overlap
-  def self.find_similar_users(user_id : Int64, limit : Int32 = 10) : Array(Int64)
-    result = POOL.query(
-      "SELECT i2.user_id, COUNT(*) as overlap
-       FROM user_interactions i1
-       JOIN user_interactions i2 ON i1.post_id = i2.post_id
-       WHERE i1.user_id = $1
-         AND i1.interaction_type = 'upvote'
-         AND i2.interaction_type = 'upvote'
-         AND i2.user_id != $1
-       GROUP BY i2.user_id
-       ORDER BY overlap DESC
-       LIMIT $2",
-      user_id, limit
-    )
     
-    users = [] of Int64
-    result.each do
-      users << result.read(Int64)
+    scored_posts.sort! { |a, b| b[0] <=> a[0] }
+    scored_posts.first(limit).map do |_, post|
+      post.merge({"feed_type" => JSON::Any.new("personalized")})
     end
-    users
   end
-  
-  # Get user engagement stats
-  def self.get_user_stats(user_id : Int64) : Hash(String, JSON::Any)
-    result = POOL.query(
-      "SELECT 
-         COUNT(DISTINCT post_id) as posts_interacted,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'upvote') as upvotes,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'downvote') as downvotes,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'comment') as comments,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'save') as saves,
-         COUNT(DISTINCT source) as sources_used
-       FROM user_interactions
-       WHERE user_id = $1",
-      user_id
-    )
+
+  # Calculate personalized score for a post
+  def self.calculate_personalized_score(post : Hash(String, JSON::Any),
+                                        source_scores : Hash(String, Float64),
+                                        tag_scores : Hash(String, Float64)) : Float64
+    base_score = Math.log([post["score"].as_i64.to_f, 1].max) / 10.0
     
-    if result.move_next
-      stats = Hash(String, JSON::Any).new
-      stats["posts_interacted"] = JSON::Any.new(result.read(Int64))
-      stats["upvotes"] = JSON::Any.new(result.read(Int64))
-      stats["downvotes"] = JSON::Any.new(result.read(Int64))
-      stats["comments"] = JSON::Any.new(result.read(Int64))
-      stats["saves"] = JSON::Any.new(result.read(Int64))
-      stats["sources_used"] = JSON::Any.new(result.read(Int64))
-      stats
-    else
-      Hash(String, JSON::Any).new
+    source = post["source"].as_s
+    source_boost = source_scores[source]? || 0.0
+    normalized_source = Math.tanh(source_boost / 10.0)
+    
+    tags = AlgoDB.extract_tags_from_text(post["title"].as_s)
+    tag_boost = 0.0
+    tags.each do |tag|
+      tag_boost += tag_scores[tag]? || 0.0
+    end
+    normalized_tag = Math.tanh((tag_boost / [tags.size, 1].max) / 10.0)
+    
+    created_at = Time.parse(post["created_at"].as_s, "%Y-%m-%d %H:%M:%S", Time::Location::UTC)
+    hours = (Time.utc - created_at).total_hours
+    time_boost = 1.0 / (1.0 + hours / 72.0)
+    
+    final_score = (base_score * 0.3) + (normalized_source * 0.35) + (normalized_tag * 0.25) + (time_boost * 0.1)
+    final_score.clamp(0.0, 1.0)
+  end
+
+  # Trending feed - posts with recent engagement spikes
+  def self.get_trending_feed(limit : Int32 = 20) : Array(Hash(String, JSON::Any))
+    AlgoDB.get_trending_posts(limit).map do |post|
+      post.merge({"feed_type" => JSON::Any.new("trending")})
     end
   end
-end
 
-# Database migration for algorithm tables
-def setup_algo_tables
-  POOL.exec <<-SQL
-    CREATE TABLE IF NOT EXISTS user_interactions (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      interaction_type TEXT NOT NULL,
-      weight FLOAT DEFAULT 1.0,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  SQL
+  # Discovery feed - new sources the user hasn't explored
+  def self.get_discovery_feed(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
+    AlgoDB.get_discovery_posts(user_id, limit).map do |post|
+      post.merge({"feed_type" => JSON::Any.new("discovery")})
+    end
+  end
 
-  POOL.exec <<-SQL
-    CREATE TABLE IF NOT EXISTS user_source_preferences (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      source TEXT NOT NULL,
-      score FLOAT DEFAULT 0.0,
-      updated_at TIMESTAMP DEFAULT NOW(),
-      CONSTRAINT unique_user_source UNIQUE (user_id, source)
-    )
-  SQL
+  # Collaborative feed - what similar users like
+  def self.get_collaborative_feed(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
+    AlgoDB.get_collaborative_recommendations(user_id, limit).map do |post|
+      post.merge({"feed_type" => JSON::Any.new("collaborative")})
+    end
+  end
 
-  POOL.exec <<-SQL
-    CREATE TABLE IF NOT EXISTS user_tag_preferences (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      tag TEXT NOT NULL,
-      score FLOAT DEFAULT 0.0,
-      updated_at TIMESTAMP DEFAULT NOW(),
-      CONSTRAINT unique_user_tag UNIQUE (user_id, tag)
-    )
-  SQL
-
-  POOL.exec "CREATE INDEX IF NOT EXISTS idx_interactions_user_id ON user_interactions(user_id)"
-  POOL.exec "CREATE INDEX IF NOT EXISTS idx_interactions_post_id ON user_interactions(post_id)"
-  POOL.exec "CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON user_interactions(created_at DESC)"
-  POOL.exec "CREATE INDEX IF NOT EXISTS idx_source_prefs_user_id ON user_source_preferences(user_id)"
-  POOL.exec "CREATE INDEX IF NOT EXISTS idx_tag_prefs_user_id ON user_tag_preferences(user_id)"
+  # Mixed feed - combines multiple feed types
+  def self.get_mixed_feed(user_id : Int64, limit : Int32 = 50) : Array(Hash(String, JSON::Any))
+    feeds = [] of Array(Hash(String, JSON::Any))
+    
+    feeds << get_hot_feed(limit // 4, 0)
+    feeds << get_personalized_feed(user_id, limit // 4, 0)
+    feeds << get_trending_feed(limit // 4)
+    feeds << get_collaborative_feed(user_id, limit // 4)
+    
+    combined = feeds.flatten
+    combined.shuffle(random: Random.new(Time.utc.to_unix))
+    combined.first(limit).map do |post|
+      post.merge({"feed_type" => JSON::Any.new("mixed")})
+    end
+  end
 end
