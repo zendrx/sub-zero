@@ -1,4 +1,5 @@
 # auth.cr - Authentication module for Crystal Aggregator
+
 require "json"
 require "crypto/bcrypt/password"
 require "jwt"
@@ -34,17 +35,17 @@ module Auth
   end
 
   # Decode and validate JWT token
-  def self.decode_token(token : String) : Hash(String, JSON::Type)?
+  def self.decode_token(token : String) : Hash(String, JSON::Any)?
     begin
       decoded = JWT.decode(token, JWT_SECRET, JWT::Algorithm::HS256)
       payload = decoded[0]
-
+      
       # Check expiration
       exp = payload["exp"]?.to_i64
       if exp && exp < Time.utc.to_unix
         return nil
       end
-
+      
       payload
     rescue
       nil
@@ -63,19 +64,19 @@ module Auth
     if username.empty? || email.empty? || password.empty?
       return {false, "All fields are required"}
     end
-
+    
     if username.size < 3 || username.size > 30
       return {false, "Username must be between 3 and 30 characters"}
     end
-
+    
     if email.size < 5 || !email.includes?("@") || !email.includes?(".")
       return {false, "Invalid email address"}
     end
-
+    
     if password.size < 6
       return {false, "Password must be at least 6 characters"}
     end
-
+    
     # Check if username or email already exists
     if UserDB.exists?(username, email)
       if UserDB.username_exists?(username)
@@ -86,11 +87,11 @@ module Auth
       end
       return {false, "Username or email already exists"}
     end
-
+    
     # Hash password and create user
     password_hash = hash_password(password)
     user_id = UserDB.create(username, email, password_hash)
-
+    
     if user_id
       {true, user_id}
     else
@@ -99,29 +100,29 @@ module Auth
   end
 
   # Login a user
-  def self.login(identifier : String, password : String) : Tuple(Bool, String | Hash(String, JSON::Type))
+  def self.login(identifier : String, password : String) : Tuple(Bool, String | Hash(String, JSON::Any))
     # Try to find by username or email
     user = UserDB.find_by_username(identifier)
     if !user
       user = UserDB.find_by_email(identifier)
     end
-
+    
     if !user
       return {false, "Invalid username or password"}
     end
-
+    
     # Verify password
     password_hash = user["password_hash"].to_s
     if !verify_password(password, password_hash)
       return {false, "Invalid username or password"}
     end
-
+    
     # Update last login
     UserDB.update_last_login(user["id"].to_i64)
-
+    
     # Generate token
     token = generate_token(user["id"].to_i64, user["username"].to_s)
-
+    
     # Return user data without password hash
     user_data = {
       "id"         => user["id"],
@@ -131,19 +132,19 @@ module Auth
       "is_admin"   => user["is_admin"],
       "token"      => token
     }
-
+    
     {true, user_data}
   end
 
   # Validate session from request headers or cookies
-  def self.validate_session(headers : HTTP::Headers, cookies : HTTP::Cookies? = nil) : Tuple(Bool, Int64?, Hash(String, JSON::Type)?)
+  def self.validate_session(headers : HTTP::Headers, cookies : HTTP::Cookies? = nil) : Tuple(Bool, Int64?, Hash(String, JSON::Any)?)
     # Try to get token from Authorization header
     auth_header = headers["Authorization"]?
     if auth_header && auth_header.starts_with?("Bearer ")
       token = auth_header[7..-1]
       return validate_token(token)
     end
-
+    
     # Try to get token from cookie
     if cookies
       cookie = cookies[SESSION_COOKIE_NAME]?
@@ -151,27 +152,27 @@ module Auth
         return validate_token(cookie.value)
       end
     end
-
+    
     {false, nil, nil}
   end
 
   # Validate a token and return user data
-  def self.validate_token(token : String) : Tuple(Bool, Int64?, Hash(String, JSON::Type)?)
+  def self.validate_token(token : String) : Tuple(Bool, Int64?, Hash(String, JSON::Any)?)
     payload = decode_token(token)
     if !payload
       return {false, nil, nil}
     end
-
+    
     user_id = payload["user_id"]?.to_i64
     if !user_id
       return {false, nil, nil}
     end
-
+    
     user = UserDB.find(user_id)
     if !user
       return {false, nil, nil}
     end
-
+    
     {true, user_id, user}
   end
 
@@ -182,7 +183,7 @@ module Auth
   end
 
   # Get current user from session
-  def self.current_user(headers : HTTP::Headers, cookies : HTTP::Cookies? = nil) : Hash(String, JSON::Type)?
+  def self.current_user(headers : HTTP::Headers, cookies : HTTP::Cookies? = nil) : Hash(String, JSON::Any)?
     _, _, user = validate_session(headers, cookies)
     user
   end
@@ -224,30 +225,31 @@ module Auth
     if !user
       return {false, "User not found"}
     end
-
+    
     # Get current password hash
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
     )
-    row = result.rows.first?
-    return {false, "User not found"} unless row
-
-    current_hash = row[0].to_s
-    if !verify_password(old_password, current_hash)
-      return {false, "Current password is incorrect"}
+    if result.move_next
+      current_hash = result.read(String)
+      if !verify_password(old_password, current_hash)
+        return {false, "Current password is incorrect"}
+      end
+    else
+      return {false, "User not found"}
     end
-
+    
     if new_password.size < 6
       return {false, "New password must be at least 6 characters"}
     end
-
+    
     new_hash = hash_password(new_password)
     POOL.exec(
       "UPDATE users SET password_hash = $1 WHERE id = $2",
       new_hash, user_id
     )
-
+    
     {true, "Password changed successfully"}
   rescue e : PG::Error
     {false, "Database error: #{e.message}"}
@@ -259,33 +261,34 @@ module Auth
     if !user
       return {false, "User not found"}
     end
-
+    
     # Get current password hash
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
     )
-    row = result.rows.first?
-    return {false, "User not found"} unless row
-
-    current_hash = row[0].to_s
-    if !verify_password(password, current_hash)
-      return {false, "Invalid password"}
+    if result.move_next
+      current_hash = result.read(String)
+      if !verify_password(password, current_hash)
+        return {false, "Invalid password"}
+      end
+    else
+      return {false, "User not found"}
     end
-
+    
     if new_email.empty? || !new_email.includes?("@")
       return {false, "Invalid email address"}
     end
-
+    
     if UserDB.email_exists?(new_email) && UserDB.find_by_email(new_email)["id"] != user_id
       return {false, "Email already in use"}
     end
-
+    
     POOL.exec(
       "UPDATE users SET email = $1 WHERE id = $2",
       new_email, user_id
     )
-
+    
     {true, "Email changed successfully"}
   rescue e : PG::Error
     {false, "Database error: #{e.message}"}
@@ -294,21 +297,22 @@ module Auth
   # Delete user account
   def self.delete_account(user_id : Int64, password : String) : Tuple(Bool, String)
     # Get current password hash
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
     )
-    row = result.rows.first?
-    return {false, "User not found"} unless row
-
-    current_hash = row[0].to_s
-    if !verify_password(password, current_hash)
-      return {false, "Invalid password"}
+    if result.move_next
+      current_hash = result.read(String)
+      if !verify_password(password, current_hash)
+        return {false, "Invalid password"}
+      end
+    else
+      return {false, "User not found"}
     end
-
+    
     # Delete user (cascade will handle related records)
     POOL.exec("DELETE FROM users WHERE id = $1", user_id)
-
+    
     {true, "Account deleted successfully"}
   rescue e : PG::Error
     {false, "Database error: #{e.message}"}
@@ -323,14 +327,14 @@ module Auth
   # Require authentication middleware
   def self.require_auth(context : HTTP::Server::Context)
     valid, user_id, user = validate_session(context.request.headers, context.request.cookies)
-
+    
     if !valid || !user_id
       context.response.status_code = 401
       context.response.content_type = "application/json"
       context.response.print %({"error":"Authentication required"})
       return false
     end
-
+    
     context.set("current_user", user)
     context.set("current_user_id", user_id)
     true
@@ -339,21 +343,21 @@ module Auth
   # Require admin middleware
   def self.require_admin(context : HTTP::Server::Context)
     valid, user_id, user = validate_session(context.request.headers, context.request.cookies)
-
+    
     if !valid || !user_id
       context.response.status_code = 401
       context.response.content_type = "application/json"
       context.response.print %({"error":"Authentication required"})
       return false
     end
-
+    
     if !is_admin?(user_id)
       context.response.status_code = 403
       context.response.content_type = "application/json"
       context.response.print %({"error":"Admin privileges required"})
       return false
     end
-
+    
     context.set("current_user", user)
     context.set("current_user_id", user_id)
     true
@@ -363,9 +367,9 @@ end
 # Helper module for easy session management in handlers
 module AuthHelpers
   # Get current user from context
-  def self.current_user(context : HTTP::Server::Context) : Hash(String, JSON::Type)?
+  def self.current_user(context : HTTP::Server::Context) : Hash(String, JSON::Any)?
     value = context.get("current_user")
-    value.is_a?(Hash(String, JSON::Type)) ? value : nil
+    value.is_a?(Hash(String, JSON::Any)) ? value : nil
   end
 
   # Get current user ID from context
