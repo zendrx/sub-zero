@@ -377,4 +377,180 @@ post "/api/comments/:id/downvote" do |env|
     }.to_json
   end
   
-  result = POOL.query("
+  result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
+  if !result.move_next
+    env.response.status_code = 404
+    next {
+      "status"  => "error",
+      "message" => "Comment not found"
+    }.to_json
+  end
+  
+  success = VoteDB.cast_comment_vote(user_id, id, -1)
+  
+  if success
+    env.response.status_code = 200
+    {
+      "status"  => "success",
+      "message" => "Comment downvoted successfully"
+    }.to_json
+  else
+    env.response.status_code = 500
+    {
+      "status"  => "error",
+      "message" => "Failed to cast vote"
+    }.to_json
+  end
+end
+
+# Get comment replies (nested comments)
+get "/api/comments/:id/replies" do |env|
+  id = env.params.url["id"].to_i64?
+  
+  if id.nil?
+    env.response.status_code = 400
+    next {
+      "status"  => "error",
+      "message" => "Invalid comment ID"
+    }.to_json
+  end
+  
+  limit = env.params.query["limit"]?.try &.to_i || 20
+  offset = env.params.query["offset"]?.try &.to_i || 0
+  
+  if limit > 100
+    limit = 100
+  end
+  
+  result = POOL.query(
+    "SELECT c.id, c.user_id, c.content, c.score, c.created_at,
+            u.username
+     FROM comments c
+     LEFT JOIN users u ON c.user_id = u.id
+     WHERE c.parent_id = $1
+     ORDER BY c.score DESC, c.created_at ASC
+     LIMIT $2 OFFSET $3",
+    id, limit, offset
+  )
+  
+  replies = [] of Hash(String, JSON::Any)
+  result.each do
+    reply = Hash(String, JSON::Any).new
+    reply["id"] = JSON::Any.new(result.read(Int64))
+    user_id = result.read(Int64?)
+    if user_id
+      reply["user_id"] = JSON::Any.new(user_id)
+    else
+      reply["user_id"] = JSON::Any.new(0_i64)
+    end
+    reply["content"] = JSON::Any.new(result.read(String))
+    reply["score"] = JSON::Any.new(result.read(Int32))
+    reply["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    username = result.read(String?)
+    if username
+      reply["username"] = JSON::Any.new(username)
+    else
+      reply["username"] = JSON::Any.new("deleted")
+    end
+    replies << reply
+  end
+  
+  env.response.status_code = 200
+  {
+    "status" => "success",
+    "comment_id" => id,
+    "results" => replies,
+    "pagination" => {
+      "limit"  => limit,
+      "offset" => offset,
+      "count"  => replies.size
+    }
+  }.to_json
+end
+
+# Get comments by user
+get "/api/comments/user/:user_id" do |env|
+  user_id = env.params.url["user_id"].to_i64?
+  
+  if user_id.nil?
+    env.response.status_code = 400
+    next {
+      "status"  => "error",
+      "message" => "Invalid user ID"
+    }.to_json
+  end
+  
+  limit = env.params.query["limit"]?.try &.to_i || 50
+  offset = env.params.query["offset"]?.try &.to_i || 0
+  
+  if limit > 100
+    limit = 100
+  end
+  
+  result = POOL.query(
+    "SELECT c.id, c.post_id, c.content, c.score, c.created_at,
+            p.title as post_title
+     FROM comments c
+     LEFT JOIN posts p ON c.post_id = p.id
+     WHERE c.user_id = $1
+     ORDER BY c.created_at DESC
+     LIMIT $2 OFFSET $3",
+    user_id, limit, offset
+  )
+  
+  comments = [] of Hash(String, JSON::Any)
+  result.each do
+    comment = Hash(String, JSON::Any).new
+    comment["id"] = JSON::Any.new(result.read(Int64))
+    comment["post_id"] = JSON::Any.new(result.read(Int64))
+    comment["content"] = JSON::Any.new(result.read(String))
+    comment["score"] = JSON::Any.new(result.read(Int32))
+    comment["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    post_title = result.read(String?)
+    if post_title
+      comment["post_title"] = JSON::Any.new(post_title)
+    else
+      comment["post_title"] = JSON::Any.new("unknown")
+    end
+    comments << comment
+  end
+  
+  env.response.status_code = 200
+  {
+    "status" => "success",
+    "user_id" => user_id,
+    "results" => comments,
+    "pagination" => {
+      "limit"  => limit,
+      "offset" => offset,
+      "count"  => comments.size
+    }
+  }.to_json
+end
+
+# Get comment count for a post
+get "/api/posts/:id/comment-count" do |env|
+  id = env.params.url["id"].to_i64?
+  
+  if id.nil?
+    env.response.status_code = 400
+    next {
+      "status"  => "error",
+      "message" => "Invalid post ID"
+    }.to_json
+  end
+  
+  result = POOL.query(
+    "SELECT COUNT(*) FROM comments WHERE post_id = $1",
+    id
+  )
+  result.move_next
+  count = result.read(Int64)
+  
+  env.response.status_code = 200
+  {
+    "status" => "success",
+    "post_id" => id,
+    "comment_count" => count
+  }.to_json
+end
