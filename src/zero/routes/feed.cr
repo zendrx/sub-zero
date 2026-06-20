@@ -1,5 +1,4 @@
 # routes/feed.cr - Feed routes for Crystal Aggregator
-# Handles all feed generation and content discovery endpoints
 
 require "json"
 require "kemal"
@@ -14,25 +13,23 @@ get "/api/feed" do |env|
     limit = 100
   end
   
-  # Check if user is authenticated for personalized feeds
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
   feed_type_enum = case feed_type
-                   when "hot" then RecommendationEngine::FeedType::Hot
-                   when "new" then RecommendationEngine::FeedType::New
-                   when "top" then RecommendationEngine::FeedType::Top
-                   when "personalized" then RecommendationEngine::FeedType::Personalized
-                   when "trending" then RecommendationEngine::FeedType::Trending
-                   when "discovery" then RecommendationEngine::FeedType::Discovery
-                   when "collaborative" then RecommendationEngine::FeedType::Collaborative
-                   when "mixed" then RecommendationEngine::FeedType::Mixed
-                   else RecommendationEngine::FeedType::Mixed
+                   when "hot" then FeedType::Hot
+                   when "new" then FeedType::New
+                   when "top" then FeedType::Top
+                   when "personalized" then FeedType::Personalized
+                   when "trending" then FeedType::Trending
+                   when "discovery" then FeedType::Discovery
+                   when "collaborative" then FeedType::Collaborative
+                   when "mixed" then FeedType::Mixed
+                   else FeedType::Mixed
                    end
   
-  # If feed requires authentication and user is not logged in
-  if (feed_type_enum == RecommendationEngine::FeedType::Personalized || 
-      feed_type_enum == RecommendationEngine::FeedType::Discovery ||
-      feed_type_enum == RecommendationEngine::FeedType::Collaborative) && !valid
+  if (feed_type_enum == FeedType::Personalized || 
+      feed_type_enum == FeedType::Discovery ||
+      feed_type_enum == FeedType::Collaborative) && !valid
     env.response.status_code = 401
     next {
       "status"  => "error",
@@ -55,7 +52,7 @@ get "/api/feed" do |env|
   }.to_json
 end
 
-# Hot feed - Reddit-style time decay
+# Hot feed
 get "/api/feed/hot" do |env|
   limit = env.params.query["limit"]?.try &.to_i || 50
   offset = env.params.query["offset"]?.try &.to_i || 0
@@ -64,7 +61,7 @@ get "/api/feed/hot" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Hot, limit, offset)
+  posts = RecommendationEngine.get_feed(nil, FeedType::Hot, limit, offset)
   
   env.response.status_code = 200
   {
@@ -79,7 +76,7 @@ get "/api/feed/hot" do |env|
   }.to_json
 end
 
-# New feed - most recent first
+# New feed
 get "/api/feed/new" do |env|
   limit = env.params.query["limit"]?.try &.to_i || 50
   offset = env.params.query["offset"]?.try &.to_i || 0
@@ -88,7 +85,7 @@ get "/api/feed/new" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::New, limit, offset)
+  posts = RecommendationEngine.get_feed(nil, FeedType::New, limit, offset)
   
   env.response.status_code = 200
   {
@@ -103,7 +100,7 @@ get "/api/feed/new" do |env|
   }.to_json
 end
 
-# Top feed - highest scoring posts
+# Top feed
 get "/api/feed/top" do |env|
   limit = env.params.query["limit"]?.try &.to_i || 50
   offset = env.params.query["offset"]?.try &.to_i || 0
@@ -112,7 +109,7 @@ get "/api/feed/top" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Top, limit, offset)
+  posts = RecommendationEngine.get_feed(nil, FeedType::Top, limit, offset)
   
   env.response.status_code = 200
   {
@@ -127,7 +124,7 @@ get "/api/feed/top" do |env|
   }.to_json
 end
 
-# Personalized feed - based on user preferences
+# Personalized feed
 get "/api/feed/personalized" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
@@ -146,7 +143,7 @@ get "/api/feed/personalized" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Personalized, limit, offset)
+  posts = RecommendationEngine.get_feed(user_id, FeedType::Personalized, limit, offset)
   
   env.response.status_code = 200
   {
@@ -161,7 +158,7 @@ get "/api/feed/personalized" do |env|
   }.to_json
 end
 
-# Trending feed - posts with recent engagement spikes
+# Trending feed
 get "/api/feed/trending" do |env|
   limit = env.params.query["limit"]?.try &.to_i || 20
   
@@ -169,7 +166,7 @@ get "/api/feed/trending" do |env|
     limit = 50
   end
   
-  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Trending, limit, 0)
+  posts = RecommendationEngine.get_feed(nil, FeedType::Trending, limit, 0)
   
   env.response.status_code = 200
   {
@@ -184,7 +181,7 @@ get "/api/feed/trending" do |env|
   }.to_json
 end
 
-# Discovery feed - new sources the user hasn't explored
+# Discovery feed
 get "/api/feed/discovery" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
@@ -202,7 +199,7 @@ get "/api/feed/discovery" do |env|
     limit = 50
   end
   
-  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Discovery, limit, 0)
+  posts = RecommendationEngine.get_feed(user_id, FeedType::Discovery, limit, 0)
   
   env.response.status_code = 200
   {
@@ -217,7 +214,7 @@ get "/api/feed/discovery" do |env|
   }.to_json
 end
 
-# Collaborative feed - what similar users like
+# Collaborative feed
 get "/api/feed/collaborative" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
@@ -235,7 +232,7 @@ get "/api/feed/collaborative" do |env|
     limit = 50
   end
   
-  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Collaborative, limit, 0)
+  posts = RecommendationEngine.get_feed(user_id, FeedType::Collaborative, limit, 0)
   
   env.response.status_code = 200
   {
@@ -250,7 +247,7 @@ get "/api/feed/collaborative" do |env|
   }.to_json
 end
 
-# Mixed feed - combines multiple feed types
+# Mixed feed
 get "/api/feed/mixed" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   limit = env.params.query["limit"]?.try &.to_i || 50
@@ -259,25 +256,17 @@ get "/api/feed/mixed" do |env|
     limit = 100
   end
   
-  # If user is authenticated, use personalized mixed feed
-  if valid && user_id
-    posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Mixed, limit, 0)
-  else
-    # For anonymous users, mix hot and new
-    hot_posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Hot, limit // 2, 0)
-    new_posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::New, limit - (limit // 2), 0)
-    posts = (hot_posts + new_posts).shuffle
-  end
+  posts = RecommendationEngine.get_feed(user_id, FeedType::Mixed, limit, 0)
   
   env.response.status_code = 200
   {
     "status" => "success",
     "feed_type" => "mixed",
-    "results" => posts.first(limit),
+    "results" => posts,
     "pagination" => {
       "limit"  => limit,
       "offset" => 0,
-      "count"  => posts.first(limit).size
+      "count"  => posts.size
     }
   }.to_json
 end
@@ -292,7 +281,6 @@ get "/api/feed/source/:source" do |env|
     limit = 100
   end
   
-  # Validate source
   valid_sources = ["reddit", "hackernews", "devto", "user"]
   if !valid_sources.includes?(source)
     env.response.status_code = 400
@@ -302,7 +290,7 @@ get "/api/feed/source/:source" do |env|
     }.to_json
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE source = $1
@@ -311,16 +299,22 @@ get "/api/feed/source/:source" do |env|
     source, limit, offset
   )
   
-  posts = result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
   
   env.response.status_code = 200
@@ -346,7 +340,7 @@ get "/api/feed/tag/:tag" do |env|
     limit = 100
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE title ILIKE $1
@@ -355,16 +349,22 @@ get "/api/feed/tag/:tag" do |env|
     "%#{tag}%", limit, offset
   )
   
-  posts = result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
   
   env.response.status_code = 200
@@ -399,7 +399,7 @@ get "/api/feed/date" do |env|
     }.to_json
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE created_at >= $1 AND created_at <= $2
@@ -408,16 +408,22 @@ get "/api/feed/date" do |env|
     from_date, to_date, limit, offset
   )
   
-  posts = result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
   
   env.response.status_code = 200
@@ -436,39 +442,39 @@ end
 
 # Feed statistics
 get "/api/feed/stats" do |env|
-  # Get total post count
-  total_result = POOL.exec("SELECT COUNT(*) FROM posts WHERE is_user_post = false")
-  total_posts = total_result.rows.first?[0].to_i64
+  total_result = POOL.query("SELECT COUNT(*) FROM posts WHERE is_user_post = false")
+  total_result.move_next
+  total_posts = total_result.read(Int64)
   
-  # Get count by source
-  source_result = POOL.exec(
+  source_result = POOL.query(
     "SELECT source, COUNT(*) as count FROM posts WHERE is_user_post = false GROUP BY source ORDER BY count DESC"
   )
-  source_counts = source_result.rows.map do |row|
-    {
-      "source" => row[0].to_s,
-      "count"  => row[1].to_i64
-    }
+  source_counts = [] of Hash(String, JSON::Any)
+  source_result.each do
+    source = Hash(String, JSON::Any).new
+    source["source"] = JSON::Any.new(source_result.read(String))
+    source["count"] = JSON::Any.new(source_result.read(Int64))
+    source_counts << source
   end
   
-  # Get posts by day (last 7 days)
-  day_result = POOL.exec(
+  day_result = POOL.query(
     "SELECT DATE(created_at) as day, COUNT(*) as count 
      FROM posts 
      WHERE created_at > NOW() - INTERVAL '7 days'
      GROUP BY DATE(created_at) 
      ORDER BY day DESC"
   )
-  daily_counts = day_result.rows.map do |row|
-    {
-      "date"  => row[0].to_s,
-      "count" => row[1].to_i64
-    }
+  daily_counts = [] of Hash(String, JSON::Any)
+  day_result.each do
+    day = Hash(String, JSON::Any).new
+    day["date"] = JSON::Any.new(day_result.read(Time).to_s)
+    day["count"] = JSON::Any.new(day_result.read(Int64))
+    daily_counts << day
   end
   
-  # Get average score
-  score_result = POOL.exec("SELECT COALESCE(AVG(score), 0) FROM posts WHERE is_user_post = false")
-  avg_score = score_result.rows.first?[0].to_f64
+  score_result = POOL.query("SELECT COALESCE(AVG(score), 0) FROM posts WHERE is_user_post = false")
+  score_result.move_next
+  avg_score = score_result.read(Float64)
   
   env.response.status_code = 200
   {
@@ -482,7 +488,7 @@ get "/api/feed/stats" do |env|
   }.to_json
 end
 
-# Refresh feed (regenerate recommendations)
+# Refresh feed
 post "/api/feed/refresh" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
@@ -493,10 +499,6 @@ post "/api/feed/refresh" do |env|
       "message" => "Authentication required"
     }.to_json
   end
-  
-  # Clear cached recommendations for this user
-  # If using Redis, you'd delete the cache key here
-  # For now, just return success
   
   env.response.status_code = 200
   {
