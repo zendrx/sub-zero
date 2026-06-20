@@ -22,7 +22,8 @@ module HNFetcher
     
     if response.status_code == 200
       begin
-        ids = JSON.parse(response.body).as_a.map(&.to_i64)
+        # Use as_i64 instead of to_i64
+        ids = JSON.parse(response.body).as_a.map(&.as_i64)
         ids.first(limit)
       rescue e : Exception
         puts "Failed to parse story IDs: #{e.message}"
@@ -53,11 +54,11 @@ module HNFetcher
         # Extract story information
         title = data["title"]?.to_s || "Untitled"
         url = data["url"]?.to_s || ""
-        score = data["score"]?.to_i || 0
-        comment_count = data["descendants"]?.to_i || 0
-        external_id = data["id"]?.to_i64.to_s
+        score = data["score"]?.try &.as_i || 0
+        comment_count = data["descendants"]?.try &.as_i || 0
+        external_id = data["id"]?.try &.as_i64.to_s
         by = data["by"]?.to_s || ""
-        time = data["time"]?.to_i || 0
+        time = data["time"]?.try &.as_i || 0
         text = data["text"]?.to_s || ""
         story_type = data["type"]?.to_s || "story"
         
@@ -145,8 +146,8 @@ module HNFetcher
           story["content"]?.to_s || "",
           story["source"]?.to_s || "hackernews",
           story["external_id"]?.to_s || "",
-          story["score"]?.to_i || 0,
-          story["comment_count"]?.to_i || 0,
+          story["score"]?.try &.as_i || 0,
+          story["comment_count"]?.try &.as_i || 0,
           false
         )
         saved_count += 1
@@ -264,7 +265,7 @@ module HNFetcher
         
         if kids = data["kids"]?
           kids.as_a.first(limit).each do |kid|
-            comment = fetch_comment(kid.to_i64)
+            comment = fetch_comment(kid.as_i64)
             comments << comment if comment
           end
         end
@@ -296,11 +297,11 @@ module HNFetcher
         return nil if data["type"]?.to_s != "comment"
         
         comment = Hash(String, JSON::Any).new
-        comment["id"] = JSON::Any.new(data["id"]?.to_i64 || 0)
+        comment["id"] = JSON::Any.new(data["id"]?.try &.as_i64 || 0)
         comment["by"] = JSON::Any.new(data["by"]?.to_s || "")
         comment["text"] = JSON::Any.new(data["text"]?.to_s || "")
-        comment["time"] = JSON::Any.new(data["time"]?.to_i || 0)
-        comment["parent"] = JSON::Any.new(data["parent"]?.to_i64 || 0)
+        comment["time"] = JSON::Any.new(data["time"]?.try &.as_i || 0)
+        comment["parent"] = JSON::Any.new(data["parent"]?.try &.as_i64 || 0)
         
         comment
       rescue e : Exception
