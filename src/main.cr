@@ -26,10 +26,65 @@ require "./zero/algo/*"
 require "./zero/aggregate/*"
 require "./zero/auth"
 
-# Start schedulers (these are defined in the aggregate files)
-start_reddit_scheduler
-start_hn_scheduler
-start_devto_scheduler
+# Start Reddit fetcher scheduler
+def start_reddit_scheduler
+  spawn do
+    loop do
+      begin
+        puts "Starting scheduled Reddit fetch..."
+        saved = RedditFetcher.full_fetch
+        if saved > 0
+          puts "Saved #{saved} Reddit posts"
+        end
+        puts "Scheduled Reddit fetch complete. Next fetch in 5 minutes."
+        sleep 5.minutes
+      rescue e : Exception
+        puts "Reddit scheduler error: #{e.message}"
+        sleep 5.minutes
+      end
+    end
+  end
+end
+
+# Start Hacker News fetcher scheduler
+def start_hn_scheduler
+  spawn do
+    loop do
+      begin
+        puts "Starting scheduled Hacker News fetch..."
+        saved = HNFetcher.full_fetch
+        if saved > 0
+          puts "Saved #{saved} Hacker News stories"
+        end
+        puts "Scheduled Hacker News fetch complete. Next fetch in 10 minutes."
+        sleep 10.minutes
+      rescue e : Exception
+        puts "Hacker News scheduler error: #{e.message}"
+        sleep 10.minutes
+      end
+    end
+  end
+end
+
+# Start Dev.to fetcher scheduler
+def start_devto_scheduler
+  spawn do
+    loop do
+      begin
+        puts "Starting scheduled Dev.to fetch..."
+        saved = DevToFetcher.full_fetch
+        if saved > 0
+          puts "Saved #{saved} Dev.to articles"
+        end
+        puts "Scheduled Dev.to fetch complete. Next fetch in 15 minutes."
+        sleep 15.minutes
+      rescue e : Exception
+        puts "Dev.to scheduler error: #{e.message}"
+        sleep 15.minutes
+      end
+    end
+  end
+end
 
 # Start prune scheduler (runs every 5 days)
 def start_prune_scheduler
@@ -44,6 +99,9 @@ def start_prune_scheduler
   end
 end
 
+start_reddit_scheduler
+start_hn_scheduler
+start_devto_scheduler
 start_prune_scheduler
 
 error 404 do |env|
