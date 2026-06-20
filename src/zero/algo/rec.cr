@@ -2,8 +2,8 @@
 
 require "json"
 
-# Feed types enum - renamed to FeedsType to avoid conflicts
-enum FeedsType
+# Feed types enum
+enum FeedType
   Hot
   New
   Top
@@ -16,36 +16,36 @@ end
 
 module RecommendationEngine
   # Get feed based on type
-  def self.get_feed(user_id : Int64? = nil, feed_type : FeedsType = FeedsType::Hot, 
+  def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
                     limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     case feed_type
-    when FeedsType::Hot
+    when FeedType::Hot
       get_hot_feed(limit, offset)
-    when FeedsType::New
+    when FeedType::New
       get_new_feed(limit, offset)
-    when FeedsType::Top
+    when FeedType::Top
       get_top_feed(limit, offset)
-    when FeedsType::Personalized
+    when FeedType::Personalized
       if user_id
         get_personalized_feed(user_id, limit, offset)
       else
         get_hot_feed(limit, offset)
       end
-    when FeedsType::Trending
+    when FeedType::Trending
       get_trending_feed(limit)
-    when FeedsType::Discovery
+    when FeedType::Discovery
       if user_id
         get_discovery_feed(user_id, limit)
       else
         get_hot_feed(limit, offset)
       end
-    when FeedsType::Collaborative
+    when FeedType::Collaborative
       if user_id
         get_collaborative_feed(user_id, limit)
       else
         get_hot_feed(limit, offset)
       end
-    when FeedsType::Mixed
+    when FeedType::Mixed
       if user_id
         get_mixed_feed(user_id, limit)
       else
