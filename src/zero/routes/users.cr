@@ -306,7 +306,8 @@ get "/api/users/:username/stats" do |env|
   )
   user_result.move_next
   joined_at = user_result.read(Time).to_s
-  last_active = user_result.read(Time?)?.try &.to_s || ""
+  last_login = user_result.read(Time?)
+  last_active = last_login ? last_login.to_s : ""
   
   env.response.status_code = 200
   {
