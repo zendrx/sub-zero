@@ -22,7 +22,6 @@ module HNFetcher
     
     if response.status_code == 200
       begin
-        # Use as_i64 instead of to_i64
         ids = JSON.parse(response.body).as_a.map(&.as_i64)
         ids.first(limit)
       rescue e : Exception
@@ -99,27 +98,28 @@ module HNFetcher
   def self.fetch_stories(ids : Array(Int64)) : Array(Hash(String, JSON::Any))
     stories = [] of Hash(String, JSON::Any)
     
-    # Use fibers for concurrent fetching
-    channels = ids.map { Channel(Hash(String, JSON::Any)?).new }
-    
-    ids.each_with_index do |id, index|
-      spawn do
-        story = fetch_story(id)
-        channels[index].send(story)
+    begin
+      # Use fibers for concurrent fetching
+      channels = ids.map { Channel(Hash(String, JSON::Any)?).new }
+      
+      ids.each_with_index do |id, index|
+        spawn do
+          story = fetch_story(id)
+          channels[index].send(story)
+        end
       end
+      
+      # Collect results
+      ids.each_with_index do |id, index|
+        story = channels[index].receive
+        if story
+          stories << story
+        end
+      end
+    rescue e : Exception
+      puts "Error fetching multiple stories: #{e.message}"
     end
     
-    # Collect results
-    ids.each_with_index do |id, index|
-      story = channels[index].receive
-      if story
-        stories << story
-      end
-    end
-    
-    stories
-  rescue e : Exception
-    puts "Error fetching multiple stories: #{e.message}"
     stories
   end
   
