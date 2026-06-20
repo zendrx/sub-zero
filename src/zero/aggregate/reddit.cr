@@ -75,17 +75,17 @@ module RedditFetcher
       if children = data["data"]? && data["data"]["children"]?
         children.as_a.each do |child|
           if post_data = child["data"]?
-            # Extract post information
+            # Extract post information - use .as_i for integers
             title = post_data["title"]?.to_s
             url = post_data["url"]?.to_s
             permalink = post_data["permalink"]?.to_s
-            score = post_data["score"]?.to_i || 0
-            comment_count = post_data["num_comments"]?.to_i || 0
+            score = post_data["score"]?.try &.as_i || 0
+            comment_count = post_data["num_comments"]?.try &.as_i || 0
             external_id = post_data["id"]?.to_s
             subreddit = post_data["subreddit"]?.to_s
-            created_utc = post_data["created_utc"]?.to_i || 0
+            created_utc = post_data["created_utc"]?.try &.as_i || 0
             author = post_data["author"]?.to_s
-            is_self = post_data["is_self"]?.to_bool || false
+            is_self = post_data["is_self"]?.try &.as_bool || false
             selftext = post_data["selftext"]?.to_s || ""
             
             # For self-posts, use the selftext as content
