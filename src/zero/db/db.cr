@@ -107,14 +107,14 @@ module UserDB
       id
     )
     if result.move_next
-      {
-        "id"         => result.read(Int64),
-        "username"   => result.read(String),
-        "email"      => result.read(String),
-        "created_at" => result.read(Time).to_s,
-        "last_login" => result.read(Time?)?.try &.to_s || "",
-        "is_admin"   => result.read(Bool?)?.try &.as(Bool) || false
-      }
+      user = Hash(String, JSON::Type).new
+      user["id"] = result.read(Int64)
+      user["username"] = result.read(String)
+      user["email"] = result.read(String)
+      user["created_at"] = result.read(Time).to_s
+      user["last_login"] = result.read(Time?)?.try &.to_s || ""
+      user["is_admin"] = result.read(Bool?)?.try &.as(Bool) || false
+      user
     else
       nil
     end
@@ -126,14 +126,14 @@ module UserDB
       username
     )
     if result.move_next
-      {
-        "id"            => result.read(Int64),
-        "username"      => result.read(String),
-        "email"         => result.read(String),
-        "password_hash" => result.read(String),
-        "created_at"    => result.read(Time).to_s,
-        "is_admin"      => result.read(Bool?)?.try &.as(Bool) || false
-      }
+      user = Hash(String, JSON::Type).new
+      user["id"] = result.read(Int64)
+      user["username"] = result.read(String)
+      user["email"] = result.read(String)
+      user["password_hash"] = result.read(String)
+      user["created_at"] = result.read(Time).to_s
+      user["is_admin"] = result.read(Bool?)?.try &.as(Bool) || false
+      user
     else
       nil
     end
@@ -145,14 +145,14 @@ module UserDB
       email
     )
     if result.move_next
-      {
-        "id"            => result.read(Int64),
-        "username"      => result.read(String),
-        "email"         => result.read(String),
-        "password_hash" => result.read(String),
-        "created_at"    => result.read(Time).to_s,
-        "is_admin"      => result.read(Bool?)?.try &.as(Bool) || false
-      }
+      user = Hash(String, JSON::Type).new
+      user["id"] = result.read(Int64)
+      user["username"] = result.read(String)
+      user["email"] = result.read(String)
+      user["password_hash"] = result.read(String)
+      user["created_at"] = result.read(Time).to_s
+      user["is_admin"] = result.read(Bool?)?.try &.as(Bool) || false
+      user
     else
       nil
     end
@@ -220,15 +220,15 @@ module PostDB
     )
     rows = [] of Hash(String, JSON::Type)
     result.each do
-      rows << {
-        "id"            => result.read(Int64),
-        "title"         => result.read(String),
-        "url"           => result.read(String?)?.try &.to_s || "",
-        "source"        => result.read(String),
-        "score"         => result.read(Int32),
-        "comment_count" => result.read(Int32),
-        "created_at"    => result.read(Time).to_s
-      }
+      post = Hash(String, JSON::Type).new
+      post["id"] = result.read(Int64)
+      post["title"] = result.read(String)
+      post["url"] = result.read(String?)?.try &.to_s || ""
+      post["source"] = result.read(String)
+      post["score"] = result.read(Int32)
+      post["comment_count"] = result.read(Int32)
+      post["created_at"] = result.read(Time).to_s
+      rows << post
     end
     rows
   end
@@ -240,15 +240,15 @@ module PostDB
     )
     rows = [] of Hash(String, JSON::Type)
     result.each do
-      rows << {
-        "id"            => result.read(Int64),
-        "title"         => result.read(String),
-        "url"           => result.read(String?)?.try &.to_s || "",
-        "source"        => result.read(String),
-        "score"         => result.read(Int32),
-        "comment_count" => result.read(Int32),
-        "created_at"    => result.read(Time).to_s
-      }
+      post = Hash(String, JSON::Type).new
+      post["id"] = result.read(Int64)
+      post["title"] = result.read(String)
+      post["url"] = result.read(String?)?.try &.to_s || ""
+      post["source"] = result.read(String)
+      post["score"] = result.read(Int32)
+      post["comment_count"] = result.read(Int32)
+      post["created_at"] = result.read(Time).to_s
+      rows << post
     end
     rows
   end
@@ -259,15 +259,15 @@ module PostDB
       id
     )
     if result.move_next
-      {
-        "id"            => result.read(Int64),
-        "title"         => result.read(String),
-        "url"           => result.read(String?)?.try &.to_s || "",
-        "source"        => result.read(String),
-        "score"         => result.read(Int32),
-        "comment_count" => result.read(Int32),
-        "created_at"    => result.read(Time).to_s
-      }
+      post = Hash(String, JSON::Type).new
+      post["id"] = result.read(Int64)
+      post["title"] = result.read(String)
+      post["url"] = result.read(String?)?.try &.to_s || ""
+      post["source"] = result.read(String)
+      post["score"] = result.read(Int32)
+      post["comment_count"] = result.read(Int32)
+      post["created_at"] = result.read(Time).to_s
+      post
     else
       nil
     end
@@ -280,15 +280,15 @@ module PostDB
     )
     rows = [] of Hash(String, JSON::Type)
     result.each do
-      rows << {
-        "id"            => result.read(Int64),
-        "title"         => result.read(String),
-        "url"           => result.read(String?)?.try &.to_s || "",
-        "source"        => result.read(String),
-        "score"         => result.read(Int32),
-        "comment_count" => result.read(Int32),
-        "created_at"    => result.read(Time).to_s
-      }
+      post = Hash(String, JSON::Type).new
+      post["id"] = result.read(Int64)
+      post["title"] = result.read(String)
+      post["url"] = result.read(String?)?.try &.to_s || ""
+      post["source"] = result.read(String)
+      post["score"] = result.read(Int32)
+      post["comment_count"] = result.read(Int32)
+      post["created_at"] = result.read(Time).to_s
+      rows << post
     end
     rows
   end
@@ -350,14 +350,14 @@ module CommentDB
     )
     rows = [] of Hash(String, JSON::Type)
     result.each do
-      rows << {
-        "id"         => result.read(Int64),
-        "user_id"    => result.read(Int64?)? 0_i64,
-        "content"    => result.read(String),
-        "score"      => result.read(Int32),
-        "parent_id"  => result.read(Int64?)?.try &.as(Int64),
-        "created_at" => result.read(Time).to_s
-      }
+      comment = Hash(String, JSON::Type).new
+      comment["id"] = result.read(Int64)
+      comment["user_id"] = result.read(Int64?)? 0_i64
+      comment["content"] = result.read(String)
+      comment["score"] = result.read(Int32)
+      comment["parent_id"] = result.read(Int64?)?.try &.as(Int64)
+      comment["created_at"] = result.read(Time).to_s
+      rows << comment
     end
     rows
   end
@@ -368,15 +368,15 @@ module CommentDB
       id
     )
     if result.move_next
-      {
-        "id"         => result.read(Int64),
-        "post_id"    => result.read(Int64),
-        "user_id"    => result.read(Int64?)? 0_i64,
-        "content"    => result.read(String),
-        "score"      => result.read(Int32),
-        "parent_id"  => result.read(Int64?)?.try &.as(Int64),
-        "created_at" => result.read(Time).to_s
-      }
+      comment = Hash(String, JSON::Type).new
+      comment["id"] = result.read(Int64)
+      comment["post_id"] = result.read(Int64)
+      comment["user_id"] = result.read(Int64?)? 0_i64
+      comment["content"] = result.read(String)
+      comment["score"] = result.read(Int32)
+      comment["parent_id"] = result.read(Int64?)?.try &.as(Int64)
+      comment["created_at"] = result.read(Time).to_s
+      comment
     else
       nil
     end
@@ -526,16 +526,16 @@ module SaveDB
     )
     rows = [] of Hash(String, JSON::Type)
     result.each do
-      rows << {
-        "id"            => result.read(Int64),
-        "title"         => result.read(String),
-        "url"           => result.read(String?)?.try &.to_s || "",
-        "source"        => result.read(String),
-        "score"         => result.read(Int32),
-        "comment_count" => result.read(Int32),
-        "created_at"    => result.read(Time).to_s,
-        "saved_at"      => result.read(Time).to_s
-      }
+      save = Hash(String, JSON::Type).new
+      save["id"] = result.read(Int64)
+      save["title"] = result.read(String)
+      save["url"] = result.read(String?)?.try &.to_s || ""
+      save["source"] = result.read(String)
+      save["score"] = result.read(Int32)
+      save["comment_count"] = result.read(Int32)
+      save["created_at"] = result.read(Time).to_s
+      save["saved_at"] = result.read(Time).to_s
+      rows << save
     end
     rows
   end
