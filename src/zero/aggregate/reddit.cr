@@ -22,7 +22,7 @@ module RedditFetcher
   TIME_RANGES = ["hour", "day", "week", "month", "year", "all"]
   
   # Fetches posts from a specific subreddit with given sort type
-  def self.fetch_subreddit(subreddit : String, sort : String = "hot", time : String = "day", limit : Int32 = LIMIT_PER_SUBREDDIT) : Array(Hash(String, JSON::Type))
+  def self.fetch_subreddit(subreddit : String, sort : String = "hot", time : String = "day", limit : Int32 = LIMIT_PER_SUBREDDIT) : Array(Hash(String, JSON::Any))
     # Build the URL based on sort type
     url = case sort
           when "hot"
@@ -54,22 +54,22 @@ module RedditFetcher
         parse_reddit_response(response.body)
       else
         puts "Failed to fetch from r/#{subreddit}: #{response.status_code}"
-        [] of Hash(String, JSON::Type)
+        [] of Hash(String, JSON::Any)
       end
     else
       puts "Failed to fetch from r/#{subreddit}: #{response.status_code}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
     puts "Error fetching r/#{subreddit}: #{e.message}"
-    [] of Hash(String, JSON::Type)
+    [] of Hash(String, JSON::Any)
   end
   
   # Parses the JSON response from Reddit
-  def self.parse_reddit_response(body : String) : Array(Hash(String, JSON::Type))
+  def self.parse_reddit_response(body : String) : Array(Hash(String, JSON::Any))
     begin
       data = JSON.parse(body)
-      posts = [] of Hash(String, JSON::Type)
+      posts = [] of Hash(String, JSON::Any)
       
       # Navigate the Reddit JSON structure
       if children = data["data"]? && data["data"]["children"]?
@@ -92,22 +92,21 @@ module RedditFetcher
             # For link posts, use the URL
             content = is_self ? selftext : ""
             
-            # Build the post hash
-            post = {
-              "title"          => title,
-              "url"            => url,
-              "content"        => content,
-              "source"         => "reddit",
-              "external_id"    => external_id,
-              "subreddit"      => subreddit,
-              "author"         => author,
-              "score"          => score,
-              "comment_count"  => comment_count,
-              "is_self"        => is_self,
-              "created_utc"    => created_utc,
-              "permalink"      => permalink,
-              "is_user_post"   => false
-            }
+            # Build the post hash using JSON::Any
+            post = Hash(String, JSON::Any).new
+            post["title"] = JSON::Any.new(title)
+            post["url"] = JSON::Any.new(url)
+            post["content"] = JSON::Any.new(content)
+            post["source"] = JSON::Any.new("reddit")
+            post["external_id"] = JSON::Any.new(external_id)
+            post["subreddit"] = JSON::Any.new(subreddit)
+            post["author"] = JSON::Any.new(author)
+            post["score"] = JSON::Any.new(score)
+            post["comment_count"] = JSON::Any.new(comment_count)
+            post["is_self"] = JSON::Any.new(is_self)
+            post["created_utc"] = JSON::Any.new(created_utc)
+            post["permalink"] = JSON::Any.new(permalink)
+            post["is_user_post"] = JSON::Any.new(false)
             
             posts << post
           end
@@ -117,25 +116,25 @@ module RedditFetcher
       posts
     rescue e : JSON::ParseException
       puts "Failed to parse JSON: #{e.message}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   end
   
   # Saves fetched posts to the database, skipping duplicates
-  def self.save_posts_to_db(posts : Array(Hash(String, JSON::Type))) : Int32
+  def self.save_posts_to_db(posts : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
     
     posts.each do |post|
       external_id = post["external_id"]?.to_s
       next if external_id.empty?
       
-      # Check if post already exists
-      result = POOL.exec(
+      # Check if post already exists using query
+      result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'reddit'",
         external_id
       )
       
-      if result.rows.empty?
+      if !result.move_next
         # Insert new post
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
@@ -164,7 +163,7 @@ module RedditFetcher
     
     # Use fibers for concurrent fetching
     channels = subreddits.map do |sub|
-      Channel(Array(Hash(String, JSON::Type))).new
+      Channel(Array(Hash(String, JSON::Any))).new
     end
     
     subreddits.each_with_index do |sub, index|
@@ -226,7 +225,7 @@ module RedditFetcher
   end
   
   # Search Reddit for posts matching a query
-  def self.search(query : String, limit : Int32 = 25) : Array(Hash(String, JSON::Type))
+  def self.search(query : String, limit : Int32 = 25) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/search.json?q=#{URI.encode_path(query)}&limit=#{limit}"
     
     response = HTTP::Client.get(url, headers: HTTP::Headers{"User-Agent" => USER_AGENT})
@@ -235,15 +234,15 @@ module RedditFetcher
       parse_reddit_response(response.body)
     else
       puts "Search failed: #{response.status_code}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
     puts "Error searching Reddit: #{e.message}"
-    [] of Hash(String, JSON::Type)
+    [] of Hash(String, JSON::Any)
   end
   
   # Fetches posts from a specific user's submissions
-  def self.fetch_user_posts(username : String, limit : Int32 = 25) : Array(Hash(String, JSON::Type))
+  def self.fetch_user_posts(username : String, limit : Int32 = 25) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/user/#{username}/submitted.json?limit=#{limit}"
     
     response = HTTP::Client.get(url, headers: HTTP::Headers{"User-Agent" => USER_AGENT})
@@ -252,11 +251,11 @@ module RedditFetcher
       parse_reddit_response(response.body)
     else
       puts "Failed to fetch user posts: #{response.status_code}"
-      [] of Hash(String, JSON::Type)
+      [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
     puts "Error fetching user posts: #{e.message}"
-    [] of Hash(String, JSON::Type)
+    [] of Hash(String, JSON::Any)
   end
   
   # Full fetch routine that combines different strategies
