@@ -16,20 +16,20 @@ get "/api/feed" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   
   feed_type_enum = case feed_type
-                   when "hot" then FeedType::Hot
-                   when "new" then FeedType::New
-                   when "top" then FeedType::Top
-                   when "personalized" then FeedType::Personalized
-                   when "trending" then FeedType::Trending
-                   when "discovery" then FeedType::Discovery
-                   when "collaborative" then FeedType::Collaborative
-                   when "mixed" then FeedType::Mixed
-                   else FeedType::Mixed
+                   when "hot" then RecommendationEngine::FeedType::Hot
+                   when "new" then RecommendationEngine::FeedType::New
+                   when "top" then RecommendationEngine::FeedType::Top
+                   when "personalized" then RecommendationEngine::FeedType::Personalized
+                   when "trending" then RecommendationEngine::FeedType::Trending
+                   when "discovery" then RecommendationEngine::FeedType::Discovery
+                   when "collaborative" then RecommendationEngine::FeedType::Collaborative
+                   when "mixed" then RecommendationEngine::FeedType::Mixed
+                   else RecommendationEngine::FeedType::Mixed
                    end
   
-  if (feed_type_enum == FeedType::Personalized || 
-      feed_type_enum == FeedType::Discovery ||
-      feed_type_enum == FeedType::Collaborative) && !valid
+  if (feed_type_enum == RecommendationEngine::FeedType::Personalized || 
+      feed_type_enum == RecommendationEngine::FeedType::Discovery ||
+      feed_type_enum == RecommendationEngine::FeedType::Collaborative) && !valid
     env.response.status_code = 401
     next {
       "status"  => "error",
@@ -61,7 +61,7 @@ get "/api/feed/hot" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(nil, FeedType::Hot, limit, offset)
+  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Hot, limit, offset)
   
   env.response.status_code = 200
   {
@@ -85,7 +85,7 @@ get "/api/feed/new" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(nil, FeedType::New, limit, offset)
+  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::New, limit, offset)
   
   env.response.status_code = 200
   {
@@ -109,7 +109,7 @@ get "/api/feed/top" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(nil, FeedType::Top, limit, offset)
+  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Top, limit, offset)
   
   env.response.status_code = 200
   {
@@ -143,7 +143,7 @@ get "/api/feed/personalized" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(user_id, FeedType::Personalized, limit, offset)
+  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Personalized, limit, offset)
   
   env.response.status_code = 200
   {
@@ -166,7 +166,7 @@ get "/api/feed/trending" do |env|
     limit = 50
   end
   
-  posts = RecommendationEngine.get_feed(nil, FeedType::Trending, limit, 0)
+  posts = RecommendationEngine.get_feed(nil, RecommendationEngine::FeedType::Trending, limit, 0)
   
   env.response.status_code = 200
   {
@@ -199,7 +199,7 @@ get "/api/feed/discovery" do |env|
     limit = 50
   end
   
-  posts = RecommendationEngine.get_feed(user_id, FeedType::Discovery, limit, 0)
+  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Discovery, limit, 0)
   
   env.response.status_code = 200
   {
@@ -232,7 +232,7 @@ get "/api/feed/collaborative" do |env|
     limit = 50
   end
   
-  posts = RecommendationEngine.get_feed(user_id, FeedType::Collaborative, limit, 0)
+  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Collaborative, limit, 0)
   
   env.response.status_code = 200
   {
@@ -256,7 +256,7 @@ get "/api/feed/mixed" do |env|
     limit = 100
   end
   
-  posts = RecommendationEngine.get_feed(user_id, FeedType::Mixed, limit, 0)
+  posts = RecommendationEngine.get_feed(user_id, RecommendationEngine::FeedType::Mixed, limit, 0)
   
   env.response.status_code = 200
   {
