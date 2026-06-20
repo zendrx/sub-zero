@@ -1,5 +1,4 @@
 # routes/search.cr - Search routes for Crystal Aggregator
-# Handles searching posts, users, comments, and other content
 
 require "json"
 require "kemal"
@@ -55,8 +54,7 @@ get "/api/search/users" do |env|
     limit = 100
   end
   
-  # Check if user is authenticated and admin for email search
-  valid, user_id, user = Auth.validate_session(env.request.headers, env.request.cookies)
+  valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   is_admin = user_id ? Auth.is_admin?(user_id) : false
   
   users = search_users(query, limit, offset, is_admin)
@@ -126,13 +124,11 @@ get "/api/search/all" do |env|
     limit = 50
   end
   
-  # Search across multiple content types
   posts = PostDB.search(query, limit, 0)
   comments = search_comments(query, nil, limit, 0)
   
-  # Get users if authenticated
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
-  users = [] of Hash(String, JSON::Type)
+  users = [] of Hash(String, JSON::Any)
   if valid && user_id
     is_admin = Auth.is_admin?(user_id)
     users = search_users(query, limit, 0, is_admin)
@@ -226,14 +222,25 @@ end
 # Advanced search with filters
 post "/api/search/advanced" do |env|
   begin
-    query = env.params.json["query"]?.try &.as(String) || ""
-    sources = env.params.json["sources"]?.try &.as(Array(String)) || [] of String
-    tags = env.params.json["tags"]?.try &.as(Array(String)) || [] of String
-    from_date = env.params.json["from_date"]?.try &.as(String)
-    to_date = env.params.json["to_date"]?.try &.as(String)
-    min_score = env.params.json["min_score"]?.try &.to_i || 0
-    limit = env.params.json["limit"]?.try &.to_i || 20
-    offset = env.params.json["offset"]?.try &.to_i || 0
+    body = env.request.body
+    if body.nil?
+      env.response.status_code = 400
+      next {
+        "status"  => "error",
+        "message" => "Request body is empty"
+      }.to_json
+    end
+    
+    json_params = JSON.parse(body)
+    
+    query = json_params["query"]?.try &.as_s || ""
+    sources = json_params["sources"]?.try &.as_a?.try &.map(&.as_s) || [] of String
+    tags = json_params["tags"]?.try &.as_a?.try &.map(&.as_s) || [] of String
+    from_date = json_params["from_date"]?.try &.as_s
+    to_date = json_params["to_date"]?.try &.as_s
+    min_score = json_params["min_score"]?.try &.as_i || 0
+    limit = json_params["limit"]?.try &.as_i || 20
+    offset = json_params["offset"]?.try &.as_i || 0
     
     if query.empty?
       env.response.status_code = 400
@@ -271,7 +278,7 @@ post "/api/search/advanced" do |env|
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Internal server error"
+      "message" => "Internal server error: #{e.message}"
     }.to_json
   end
 end
@@ -279,10 +286,9 @@ end
 # Helper functions for searching
 
 # Search users by username
-def search_users(query : String, limit : Int32, offset : Int32, is_admin : Bool = false) : Array(Hash(String, JSON::Type))
+def search_users(query : String, limit : Int32, offset : Int32, is_admin : Bool = false) : Array(Hash(String, JSON::Any))
   if is_admin
-    # Admins can search by username or email
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT id, username, email, created_at, is_admin 
        FROM users 
        WHERE username ILIKE $1 OR email ILIKE $1
@@ -291,8 +297,7 @@ def search_users(query : String, limit : Int32, offset : Int32, is_admin : Bool 
       "%#{query}%", limit, offset
     )
   else
-    # Regular users can only search by username
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT id, username, email, created_at, is_admin 
        FROM users 
        WHERE username ILIKE $1
@@ -302,21 +307,28 @@ def search_users(query : String, limit : Int32, offset : Int32, is_admin : Bool 
     )
   end
   
-  result.rows.map do |row|
-    {
-      "id"         => row[0].to_i64,
-      "username"   => row[1].to_s,
-      "email"      => is_admin ? row[2].to_s : nil,
-      "created_at" => row[3].to_s,
-      "is_admin"   => row[4].to_bool
-    }
+  users = [] of Hash(String, JSON::Any)
+  result.each do
+    user = Hash(String, JSON::Any).new
+    user["id"] = JSON::Any.new(result.read(Int64))
+    user["username"] = JSON::Any.new(result.read(String))
+    if is_admin
+      user["email"] = JSON::Any.new(result.read(String))
+    else
+      email = result.read(String)
+      user["email"] = JSON::Any.new(nil)
+    end
+    user["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    user["is_admin"] = JSON::Any.new(result.read(Bool))
+    users << user
   end
+  users
 end
 
 # Search comments
-def search_comments(query : String, post_id : Int64? = nil, limit : Int32 = 20, offset : Int32 = 0) : Array(Hash(String, JSON::Type))
+def search_comments(query : String, post_id : Int64? = nil, limit : Int32 = 20, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
   if post_id
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT c.id, c.post_id, c.user_id, c.content, c.score, c.created_at,
               u.username, p.title as post_title
        FROM comments c
@@ -328,7 +340,7 @@ def search_comments(query : String, post_id : Int64? = nil, limit : Int32 = 20, 
       "%#{query}%", post_id, limit, offset
     )
   else
-    result = POOL.exec(
+    result = POOL.query(
       "SELECT c.id, c.post_id, c.user_id, c.content, c.score, c.created_at,
               u.username, p.title as post_title
        FROM comments c
@@ -341,23 +353,40 @@ def search_comments(query : String, post_id : Int64? = nil, limit : Int32 = 20, 
     )
   end
   
-  result.rows.map do |row|
-    {
-      "id"          => row[0].to_i64,
-      "post_id"     => row[1].to_i64,
-      "user_id"     => row[2]?.try &.to_i64,
-      "content"     => row[3].to_s,
-      "score"       => row[4].to_i,
-      "created_at"  => row[5].to_s,
-      "username"    => row[6]?.try &.to_s || "deleted",
-      "post_title"  => row[7]?.try &.to_s || "unknown"
-    }
+  comments = [] of Hash(String, JSON::Any)
+  result.each do
+    comment = Hash(String, JSON::Any).new
+    comment["id"] = JSON::Any.new(result.read(Int64))
+    comment["post_id"] = JSON::Any.new(result.read(Int64))
+    user_id = result.read(Int64?)
+    if user_id
+      comment["user_id"] = JSON::Any.new(user_id)
+    else
+      comment["user_id"] = JSON::Any.new(0_i64)
+    end
+    comment["content"] = JSON::Any.new(result.read(String))
+    comment["score"] = JSON::Any.new(result.read(Int32))
+    comment["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    username = result.read(String?)
+    if username
+      comment["username"] = JSON::Any.new(username)
+    else
+      comment["username"] = JSON::Any.new("deleted")
+    end
+    post_title = result.read(String?)
+    if post_title
+      comment["post_title"] = JSON::Any.new(post_title)
+    else
+      comment["post_title"] = JSON::Any.new("unknown")
+    end
+    comments << comment
   end
+  comments
 end
 
 # Search by source
-def search_by_source(source : String, query : String, limit : Int32, offset : Int32) : Array(Hash(String, JSON::Type))
-  result = POOL.exec(
+def search_by_source(source : String, query : String, limit : Int32, offset : Int32) : Array(Hash(String, JSON::Any))
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE source = $1 AND title ILIKE $2
@@ -366,22 +395,29 @@ def search_by_source(source : String, query : String, limit : Int32, offset : In
     source, "%#{query}%", limit, offset
   )
   
-  result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
+  posts
 end
 
 # Search by tag (simple tag matching from title)
-def search_by_tag(tag : String, limit : Int32, offset : Int32) : Array(Hash(String, JSON::Type))
-  result = POOL.exec(
+def search_by_tag(tag : String, limit : Int32, offset : Int32) : Array(Hash(String, JSON::Any))
+  result = POOL.query(
     "SELECT id, title, url, source, score, comment_count, created_at
      FROM posts
      WHERE title ILIKE $1
@@ -390,25 +426,31 @@ def search_by_tag(tag : String, limit : Int32, offset : Int32) : Array(Hash(Stri
     "%#{tag}%", limit, offset
   )
   
-  result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
+  posts
 end
 
 # Advanced search with multiple filters
 def advanced_search(query : String, sources : Array(String), tags : Array(String), 
                    from_date : String?, to_date : String?, min_score : Int32,
-                   limit : Int32, offset : Int32) : Array(Hash(String, JSON::Type))
+                   limit : Int32, offset : Int32) : Array(Hash(String, JSON::Any))
   
-  # Build the SQL query dynamically
   sql = "SELECT id, title, url, source, score, comment_count, created_at FROM posts WHERE title ILIKE $1"
   params = ["%#{query}%"] of String | Int32 | String
   
@@ -443,17 +485,24 @@ def advanced_search(query : String, sources : Array(String), tags : Array(String
   params << limit
   params << offset
   
-  result = POOL.exec(sql, args: params)
+  result = POOL.query(sql, args: params)
   
-  result.rows.map do |row|
-    {
-      "id"            => row[0].to_i64,
-      "title"         => row[1].to_s,
-      "url"           => row[2]?.try &.to_s || "",
-      "source"        => row[3].to_s,
-      "score"         => row[4].to_i,
-      "comment_count" => row[5].to_i,
-      "created_at"    => row[6].to_s
-    }
+  posts = [] of Hash(String, JSON::Any)
+  result.each do
+    post = Hash(String, JSON::Any).new
+    post["id"] = JSON::Any.new(result.read(Int64))
+    post["title"] = JSON::Any.new(result.read(String))
+    url = result.read(String?)
+    if url
+      post["url"] = JSON::Any.new(url)
+    else
+      post["url"] = JSON::Any.new("")
+    end
+    post["source"] = JSON::Any.new(result.read(String))
+    post["score"] = JSON::Any.new(result.read(Int32))
+    post["comment_count"] = JSON::Any.new(result.read(Int32))
+    post["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    posts << post
   end
+  posts
 end
