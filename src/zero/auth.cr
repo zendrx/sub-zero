@@ -55,7 +55,11 @@ module Auth
   # Get user ID from token
   def self.user_id_from_token(token : String) : Int64?
     payload = decode_token(token)
-    payload["user_id"]?.to_i64
+    if payload
+      payload["user_id"]?.to_i64
+    else
+      nil
+    end
   end
 
   # Register a new user
