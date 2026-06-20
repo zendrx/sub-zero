@@ -3,19 +3,6 @@
 require "json"
 require "kemal"
 
-# Helper to safely extract value from JSON params
-def extract_json_value(value : JSON::Any?) : JSON::Any?
-  return nil if value.nil?
-  case value
-  when JSON::Any
-    value
-  when Array(JSON::Any)
-    value.first?
-  else
-    nil
-  end
-end
-
 # Create a new comment
 post "/api/comments" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
@@ -29,17 +16,10 @@ post "/api/comments" do |env|
   end
   
   begin
-    json_params = env.params.json
-    
-    # Extract values safely using the helper
-    post_id_value = extract_json_value(json_params["post_id"]?)
-    post_id = post_id_value.try &.as_i64
-    
-    content_value = extract_json_value(json_params["content"]?)
-    content = content_value.try &.as_s || ""
-    
-    parent_id_value = extract_json_value(json_params["parent_id"]?)
-    parent_id = parent_id_value.try &.as_i64
+    # Access JSON params directly - they're already JSON::Any
+    post_id = env.params.json["post_id"]?.try &.as_i64
+    content = env.params.json["content"]?.try &.as_s || ""
+    parent_id = env.params.json["parent_id"]?.try &.as_i64
     
     if post_id.nil?
       env.response.status_code = 400
@@ -196,8 +176,7 @@ put "/api/comments/:id" do |env|
   end
   
   begin
-    content_value = extract_json_value(env.params.json["content"]?)
-    content = content_value.try &.as_s || ""
+    content = env.params.json["content"]?.try &.as_s || ""
     
     if content.empty?
       env.response.status_code = 400
