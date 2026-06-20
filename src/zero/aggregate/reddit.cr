@@ -161,29 +161,30 @@ module RedditFetcher
   def self.fetch_multi_subreddits(subreddits : Array(String) = SUBREDDITS, sort : String = "hot", time : String = "day") : Int32
     total_saved = 0
     
-    # Use fibers for concurrent fetching
-    channels = subreddits.map do |sub|
-      Channel(Array(Hash(String, JSON::Any))).new
-    end
-    
-    subreddits.each_with_index do |sub, index|
-      spawn do
-        posts = fetch_subreddit(sub, sort, time)
-        channels[index].send(posts)
+    begin
+      # Use fibers for concurrent fetching
+      channels = subreddits.map do |sub|
+        Channel(Array(Hash(String, JSON::Any))).new
       end
+      
+      subreddits.each_with_index do |sub, index|
+        spawn do
+          posts = fetch_subreddit(sub, sort, time)
+          channels[index].send(posts)
+        end
+      end
+      
+      # Collect and save results
+      subreddits.each_with_index do |sub, index|
+        posts = channels[index].receive
+        saved = save_posts_to_db(posts)
+        total_saved += saved
+        puts "Saved #{saved} posts from r/#{sub}"
+      end
+    rescue e : Exception
+      puts "Error in multi-subreddit fetch: #{e.message}"
     end
     
-    # Collect and save results
-    subreddits.each_with_index do |sub, index|
-      posts = channels[index].receive
-      saved = save_posts_to_db(posts)
-      total_saved += saved
-      puts "Saved #{saved} posts from r/#{sub}"
-    end
-    
-    total_saved
-  rescue e : Exception
-    puts "Error in multi-subreddit fetch: #{e.message}"
     total_saved
   end
   
