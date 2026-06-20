@@ -64,7 +64,6 @@ module Auth
 
   # Register a new user
   def self.register(username : String, email : String, password : String) : Tuple(Bool, String | Int64)
-    # Validate inputs
     if username.empty? || email.empty? || password.empty?
       return {false, "All fields are required"}
     end
@@ -81,7 +80,6 @@ module Auth
       return {false, "Password must be at least 6 characters"}
     end
     
-    # Check if username or email already exists
     if UserDB.exists?(username, email)
       if UserDB.username_exists?(username)
         return {false, "Username already taken"}
@@ -92,7 +90,6 @@ module Auth
       return {false, "Username or email already exists"}
     end
     
-    # Hash password and create user
     password_hash = hash_password(password)
     user_id = UserDB.create(username, email, password_hash)
     
@@ -105,7 +102,6 @@ module Auth
 
   # Login a user
   def self.login(identifier : String, password : String) : Tuple(Bool, String | Hash(String, JSON::Any))
-    # Try to find by username or email
     user = UserDB.find_by_username(identifier)
     if !user
       user = UserDB.find_by_email(identifier)
@@ -115,19 +111,15 @@ module Auth
       return {false, "Invalid username or password"}
     end
     
-    # Verify password
     password_hash = user["password_hash"].as_s
     if !verify_password(password, password_hash)
       return {false, "Invalid username or password"}
     end
     
-    # Update last login
     UserDB.update_last_login(user["id"].as_i64)
     
-    # Generate token
     token = generate_token(user["id"].as_i64, user["username"].as_s)
     
-    # Return user data without password hash
     user_data = {
       "id"         => user["id"],
       "username"   => user["username"],
@@ -142,14 +134,12 @@ module Auth
 
   # Validate session from request headers or cookies
   def self.validate_session(headers : HTTP::Headers, cookies : HTTP::Cookies? = nil) : Tuple(Bool, Int64?, Hash(String, JSON::Any)?)
-    # Try to get token from Authorization header
     auth_header = headers["Authorization"]?
     if auth_header && auth_header.starts_with?("Bearer ")
       token = auth_header[7..-1]
       return validate_token(token)
     end
     
-    # Try to get token from cookie
     if cookies
       cookie = cookies[SESSION_COOKIE_NAME]?
       if cookie
@@ -230,7 +220,6 @@ module Auth
       return {false, "User not found"}
     end
     
-    # Get current password hash
     result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
@@ -266,7 +255,6 @@ module Auth
       return {false, "User not found"}
     end
     
-    # Get current password hash
     result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
@@ -300,7 +288,6 @@ module Auth
 
   # Delete user account
   def self.delete_account(user_id : Int64, password : String) : Tuple(Bool, String)
-    # Get current password hash
     result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
@@ -314,7 +301,6 @@ module Auth
       return {false, "User not found"}
     end
     
-    # Delete user (cascade will handle related records)
     POOL.exec("DELETE FROM users WHERE id = $1", user_id)
     
     {true, "Account deleted successfully"}
