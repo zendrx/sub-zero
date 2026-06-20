@@ -133,10 +133,21 @@ get "/health" do |env|
   }.to_json
 end
 
+def logged_in?(env)
+  value = env.get("logged_in")
+  value.is_a?(Bool) ? value : false
+end
+
+def current_user(env)
+  value = env.get("current_user")
+  value.is_a?(Hash(String, JSON::Any)) ? value : {} of String => JSON::Any
+end
+
 get "/" do |env|
   valid, user_id, user = Auth.validate_session(env.request.headers, env.request.cookies)
   env.set "logged_in", valid && user_id ? true : false
-  env.set "current_user", user || {} of String => JSON::Any
+  # Store user as a JSON string since we can't store Hash directly
+  env.set "current_user", user.to_json
   render "views/index.ecr"
 end
 
@@ -164,7 +175,7 @@ get "/settings" do |env|
     env.redirect "/login"
     next
   end
-  env.set "current_user", user || {} of String => JSON::Any
+  env.set "current_user", user.to_json
   render "views/settings.ecr"
 end
 
@@ -213,16 +224,6 @@ post "/logout" do |env|
   cookie = Auth.logout
   env.response.cookies << cookie
   env.redirect "/"
-end
-
-def logged_in?(env)
-  value = env.get("logged_in")
-  value.is_a?(Bool) ? value : false
-end
-
-def current_user(env)
-  value = env.get("current_user")
-  value.is_a?(Hash(String, JSON::Any)) ? value : {} of String => JSON::Any
 end
 
 port = ENV["PORT"]?.try &.to_i || 3000
