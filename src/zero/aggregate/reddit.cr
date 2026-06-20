@@ -135,7 +135,7 @@ module RedditFetcher
       )
       
       if !result.move_next
-        # Insert new post
+        # Insert new post - use as_i for integer values
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
           post["title"]?.to_s || "Untitled",
@@ -143,8 +143,8 @@ module RedditFetcher
           post["content"]?.to_s || "",
           post["source"]?.to_s || "reddit",
           post["external_id"]?.to_s || "",
-          post["score"]?.to_i || 0,
-          post["comment_count"]?.to_i || 0,
+          post["score"]?.try &.as_i || 0,
+          post["comment_count"]?.try &.as_i || 0,
           false
         )
         saved_count += 1
