@@ -40,6 +40,9 @@ module Auth
       decoded = JWT.decode(token, JWT_SECRET, JWT::Algorithm::HS256)
       payload = decoded[0]
       
+      # Check if payload is a Hash
+      return nil unless payload.is_a?(Hash(String, JSON::Any))
+      
       # Check expiration - handle nil safely with try
       exp = payload["exp"]?.try &.as_i64
       if exp && exp < Time.utc.to_unix
