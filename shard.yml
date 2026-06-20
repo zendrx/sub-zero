@@ -13,11 +13,8 @@ description: |
 dependencies:
   kemal:
     github: kemalcr/kemal
-    version: ~> 1.5.0
   pg:
     github: will/crystal-pg
-    version: ~> 0.27.0
   jwt:
     github: crystal-community/jwt
-    version: ~> 1.0.0
     
