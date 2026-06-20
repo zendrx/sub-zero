@@ -12,12 +12,12 @@ module AlgoDB
        VALUES ($1, $2, $3, $4, NOW())",
       user_id, post_id, interaction_type, weight
     )
-    
+
     update_user_preferences(user_id, post_id, interaction_type, weight)
   rescue e : PG::Error
     puts "Failed to record interaction: #{e.message}"
   end
-  
+
   # Update user preferences based on an interaction
   def self.update_user_preferences(user_id : Int64, post_id : Int64, interaction_type : String, weight : Float64 = 1.0)
     result = POOL.query(
@@ -27,10 +27,10 @@ module AlgoDB
     if !result.move_next
       return
     end
-    
+
     source = result.read(String)
     title = result.read(String)
-    
+
     interaction_weights = {
       "upvote"   => 2.0,
       "comment"  => 1.5,
@@ -38,11 +38,11 @@ module AlgoDB
       "share"    => 2.5,
       "view"     => 0.5,
       "click"    => 0.8,
-      "downvote" => -1.0
+      "downvote" => -1.0,
     }
-    
+
     effective_weight = weight * (interaction_weights[interaction_type]? || 0.5)
-    
+
     POOL.exec(
       "INSERT INTO user_source_preferences (user_id, source, score, updated_at)
        VALUES ($1, $2, $3, NOW())
@@ -51,7 +51,7 @@ module AlgoDB
            updated_at = NOW()",
       user_id, source, effective_weight
     )
-    
+
     tags = extract_tags_from_text(title)
     tags.each do |tag|
       POOL.exec(
@@ -64,33 +64,33 @@ module AlgoDB
       )
     end
   end
-  
+
   # Extract simple tags from text
   def self.extract_tags_from_text(text : String) : Array(String)
     tags = [] of String
     text = text.downcase
-    
-    common_tags = ["ruby", "python", "javascript", "react", "rails", "go", "rust", 
+
+    common_tags = ["ruby", "python", "javascript", "react", "rails", "go", "rust",
                    "devops", "cloud", "ai", "machinelearning", "webdev", "security",
                    "database", "api", "microservices", "kubernetes", "docker", "linux",
                    "vim", "emacs", "vscode", "git", "github", "opensource", "startup"]
-    
+
     common_tags.each do |tag|
       if text.includes?(tag)
         tags << tag
       end
     end
-    
+
     tags
   end
-  
+
   # Calculate hot score for a post
   def self.calculate_hot_score(upvotes : Int32, downvotes : Int32, created_at : Time) : Float64
     score = upvotes - downvotes
     hours = (Time.utc - created_at).total_hours
     Math.log([score, 1].max) + (hours / 45000.0)
   end
-  
+
   # Get user's source preferences
   def self.get_user_source_preferences(user_id : Int64) : Hash(String, Float64)
     preferences = {} of String => Float64
@@ -103,7 +103,7 @@ module AlgoDB
     end
     preferences
   end
-  
+
   # Get user's tag preferences
   def self.get_user_tag_preferences(user_id : Int64) : Hash(String, Float64)
     preferences = {} of String => Float64
@@ -116,14 +116,14 @@ module AlgoDB
     end
     preferences
   end
-  
+
   # Get trending posts based on recent engagement spikes
   def self.get_trending_posts(limit : Int32 = 20) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at,
               COUNT(i.id) as recent_interactions
        FROM posts p
-       LEFT JOIN user_interactions i ON p.id = i.post_id 
+       LEFT JOIN user_interactions i ON p.id = i.post_id
          AND i.created_at > NOW() - INTERVAL '1 hour'
        WHERE p.created_at > NOW() - INTERVAL '7 days'
        GROUP BY p.id
@@ -132,7 +132,7 @@ module AlgoDB
        LIMIT $1",
       limit
     )
-    
+
     posts = [] of Hash(String, JSON::Any)
     result.each do
       post = Hash(String, JSON::Any).new
@@ -153,14 +153,14 @@ module AlgoDB
     end
     posts
   end
-  
+
   # Get posts from sources a user hasn't seen much of
   def self.get_discovery_posts(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at
        FROM posts p
        WHERE p.source NOT IN (
-         SELECT source FROM user_source_preferences 
+         SELECT source FROM user_source_preferences
          WHERE user_id = $1 AND score > 0.5
        )
        AND p.id NOT IN (
@@ -171,7 +171,7 @@ module AlgoDB
        LIMIT $2",
       user_id, limit
     )
-    
+
     posts = [] of Hash(String, JSON::Any)
     result.each do
       post = Hash(String, JSON::Any).new
@@ -191,12 +191,12 @@ module AlgoDB
     end
     posts
   end
-  
+
   # Get collaborative recommendations
   def self.get_collaborative_recommendations(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
     similar_users = find_similar_users(user_id, 10)
     return [] of Hash(String, JSON::Any) if similar_users.empty?
-    
+
     result = POOL.query(
       "SELECT DISTINCT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at,
               COUNT(DISTINCT i.user_id) as similar_user_votes
@@ -213,7 +213,7 @@ module AlgoDB
        LIMIT $2",
       user_id, limit
     )
-    
+
     posts = [] of Hash(String, JSON::Any)
     result.each do
       post = Hash(String, JSON::Any).new
@@ -234,7 +234,7 @@ module AlgoDB
     end
     posts
   end
-  
+
   # Find similar users based on voting overlap
   def self.find_similar_users(user_id : Int64, limit : Int32 = 10) : Array(Int64)
     result = POOL.query(
@@ -250,18 +250,18 @@ module AlgoDB
        LIMIT $2",
       user_id, limit
     )
-    
+
     users = [] of Int64
     result.each do
       users << result.read(Int64)
     end
     users
   end
-  
+
   # Get user engagement stats
   def self.get_user_stats(user_id : Int64) : Hash(String, JSON::Any)
     result = POOL.query(
-      "SELECT 
+      "SELECT
          COUNT(DISTINCT post_id) as posts_interacted,
          COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'upvote') as upvotes,
          COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'downvote') as downvotes,
@@ -272,7 +272,7 @@ module AlgoDB
        WHERE user_id = $1",
       user_id
     )
-    
+
     if result.move_next
       stats = Hash(String, JSON::Any).new
       stats["posts_interacted"] = JSON::Any.new(result.read(Int64))

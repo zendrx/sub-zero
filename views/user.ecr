@@ -229,7 +229,7 @@
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/search">Search</a>
-        <% if logged_in? %>
+        <% if logged_in?(env) %>
           <a href="/settings">Settings</a>
           <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
         <% else %>

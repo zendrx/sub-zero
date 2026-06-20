@@ -381,8 +381,8 @@
 
     function profileForm() {
       return {
-        username: '<%= current_user["username"] %>',
-        email: '<%= current_user["email"] %>',
+        username: '<%= current_user(env)["username"] %>',
+        email: '<%= current_user(env)["email"] %>',
         loading: false,
         errors: { email: '' },
         updateProfile() {

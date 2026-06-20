@@ -7,19 +7,19 @@ require "json"
 module DevToFetcher
   # Dev.to API endpoints
   BASE_URL = "https://dev.to/api"
-  
+
   # Number of articles to fetch per request
   DEFAULT_LIMIT = 30
-  
+
   # Article sorting options
   SORT_OPTIONS = ["hot", "top", "new", "feed"]
-  
+
   # Time ranges for top articles
   TIME_RANGES = ["week", "month", "year", "infinity"]
-  
+
   # Tag list for filtering
   POPULAR_TAGS = ["ruby", "javascript", "python", "react", "rails", "go", "rust", "devops", "cloud", "ai", "machinelearning", "webdev"]
-  
+
   # Fetches articles with optional filters
   def self.fetch_articles(params : Hash(String, String | Int32 | Nil) = {} of String => String | Int32 | Nil) : Array(Hash(String, JSON::Any))
     # Build query string
@@ -29,14 +29,14 @@ module DevToFetcher
         query << "#{key}=#{URI.encode_path(value.to_s)}"
       end
     end
-    
+
     url = query.empty? ? "#{BASE_URL}/articles" : "#{BASE_URL}/articles?#{query.join("&")}"
-    
+
     # Add User-Agent header
     headers = HTTP::Headers{"User-Agent" => "CrystalAggregator/1.0"}
-    
+
     response = HTTP::Client.get(url, headers: headers)
-    
+
     if response.status_code == 200
       parse_articles_response(response.body)
     elsif response.status_code == 429
@@ -58,13 +58,13 @@ module DevToFetcher
     puts "Error fetching articles: #{e.message}"
     [] of Hash(String, JSON::Any)
   end
-  
+
   # Parses the JSON response from Dev.to
   def self.parse_articles_response(body : String) : Array(Hash(String, JSON::Any))
     begin
       data = JSON.parse(body)
       articles = [] of Hash(String, JSON::Any)
-      
+
       data.as_a.each do |article|
         # Extract article information - use .try &.as_i for integers
         title = article["title"]?.to_s || "Untitled"
@@ -77,21 +77,21 @@ module DevToFetcher
         comments_count = article["comments_count"]?.try &.as_i || 0
         external_id = article["id"]?.try &.as_i64.to_s
         reading_time_minutes = article["reading_time_minutes"]?.try &.as_i || 0
-        
+
         user = article["user"]?
         user_name = user ? user["name"]?.to_s : ""
         user_username = user ? user["username"]?.to_s : ""
         user_profile_image = user ? user["profile_image"]?.to_s : ""
         user_github = user ? user["github_username"]?.to_s : ""
         user_twitter = user ? user["twitter_username"]?.to_s : ""
-        
+
         organisation = article["organization"]?
         org_name = organisation ? organisation["name"]?.to_s : ""
-        
+
         # Build content from description and tags
         content = description
         tags = tag_list.split(",").map(&.strip).join(", ")
-        
+
         # Build the article hash using JSON::Any
         article_data = Hash(String, JSON::Any).new
         article_data["title"] = JSON::Any.new(title)
@@ -109,31 +109,31 @@ module DevToFetcher
         article_data["author_username"] = JSON::Any.new(user_username)
         article_data["reading_time"] = JSON::Any.new(reading_time_minutes)
         article_data["org_name"] = JSON::Any.new(org_name)
-        
+
         articles << article_data
       end
-      
+
       articles
     rescue e : JSON::ParseException
       puts "Failed to parse JSON: #{e.message}"
       [] of Hash(String, JSON::Any)
     end
   end
-  
+
   # Saves fetched articles to the database, skipping duplicates
   def self.save_articles_to_db(articles : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
-    
+
     articles.each do |article|
       external_id = article["external_id"]?.to_s
       next if external_id.empty?
-      
+
       # Check if article already exists
       result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'devto'",
         external_id
       )
-      
+
       if !result.move_next
         # Insert new article
         POOL.exec(
@@ -150,19 +150,19 @@ module DevToFetcher
         saved_count += 1
       end
     end
-    
+
     saved_count
   rescue e : PG::Error
     puts "Database error while saving articles: #{e.message}"
     0
   end
-  
+
   # Fetches latest articles
   def self.fetch_latest_articles(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching latest articles from Dev.to..."
     params = {
       "per_page" => limit,
-      "sort"     => "new"
+      "sort"     => "new",
     }
     articles = fetch_articles(params)
     saved = save_articles_to_db(articles)
@@ -172,14 +172,14 @@ module DevToFetcher
     puts "Error fetching latest articles: #{e.message}"
     0
   end
-  
+
   # Fetches top articles
   def self.fetch_top_articles(limit : Int32 = DEFAULT_LIMIT, time_range : String = "week") : Int32
     puts "Fetching top articles from Dev.to for #{time_range}..."
     params = {
       "per_page"   => limit,
       "sort"       => "top",
-      "top_period" => time_range
+      "top_period" => time_range,
     }
     articles = fetch_articles(params)
     saved = save_articles_to_db(articles)
@@ -189,13 +189,13 @@ module DevToFetcher
     puts "Error fetching top articles: #{e.message}"
     0
   end
-  
+
   # Fetches hot articles
   def self.fetch_hot_articles(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching hot articles from Dev.to..."
     params = {
       "per_page" => limit,
-      "sort"     => "hot"
+      "sort"     => "hot",
     }
     articles = fetch_articles(params)
     saved = save_articles_to_db(articles)
@@ -205,13 +205,13 @@ module DevToFetcher
     puts "Error fetching hot articles: #{e.message}"
     0
   end
-  
+
   # Fetches articles by tag
   def self.fetch_articles_by_tag(tag : String, limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching articles tagged with '#{tag}' from Dev.to..."
     params = {
       "per_page" => limit,
-      "tag"      => tag
+      "tag"      => tag,
     }
     articles = fetch_articles(params)
     saved = save_articles_to_db(articles)
@@ -221,22 +221,22 @@ module DevToFetcher
     puts "Error fetching articles by tag: #{e.message}"
     0
   end
-  
+
   # Fetches articles from multiple tags
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = 10) : Int32
     total_saved = 0
-    
+
     begin
       # Use fibers for concurrent fetching
       channels = tags.map { Channel(Int32).new }
-      
+
       tags.each_with_index do |tag, index|
         spawn do
           saved = fetch_articles_by_tag(tag, limit_per_tag)
           channels[index].send(saved)
         end
       end
-      
+
       # Collect results
       tags.each_with_index do |tag, index|
         saved = channels[index].receive
@@ -247,16 +247,16 @@ module DevToFetcher
     rescue e : Exception
       puts "Error fetching articles by tags: #{e.message}"
     end
-    
+
     total_saved
   end
-  
+
   # Fetches articles by username
   def self.fetch_articles_by_username(username : String, limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching articles by '#{username}' from Dev.to..."
     params = {
       "per_page" => limit,
-      "username" => username
+      "username" => username,
     }
     articles = fetch_articles(params)
     saved = save_articles_to_db(articles)
@@ -266,13 +266,13 @@ module DevToFetcher
     puts "Error fetching articles by username: #{e.message}"
     0
   end
-  
+
   # Fetches articles by organization
   def self.fetch_articles_by_organization(org_name : String, limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching articles by organization '#{org_name}' from Dev.to..."
     params = {
       "per_page" => limit,
-      "org"      => org_name
+      "org"      => org_name,
     }
     articles = fetch_articles(params)
     saved = save_articles_to_db(articles)
@@ -282,24 +282,24 @@ module DevToFetcher
     puts "Error fetching articles by organization: #{e.message}"
     0
   end
-  
+
   # Full fetch routine that combines multiple sources
   def self.full_fetch
     puts "Starting full Dev.to fetch..."
-    
+
     # Fetch hot articles
     saved_hot = fetch_hot_articles(25)
-    
+
     # Fetch top articles for different time ranges
     saved_top_week = fetch_top_articles(15, "week")
     saved_top_month = fetch_top_articles(10, "month")
-    
+
     # Fetch latest articles
     saved_latest = fetch_latest_articles(20)
-    
+
     # Fetch articles from popular tags
     saved_tags = fetch_articles_by_tags(["ruby", "python", "javascript", "go", "rust"], 8)
-    
+
     total = saved_hot + saved_top_week + saved_top_month + saved_latest + saved_tags
     puts "Dev.to fetch complete. Total saved: #{total} articles"
     total
@@ -307,18 +307,18 @@ module DevToFetcher
     puts "Full fetch failed: #{e.message}"
     0
   end
-  
+
   # Fetches a single article by ID
   def self.fetch_article_by_id(id : Int64) : Hash(String, JSON::Any)?
     url = "#{BASE_URL}/articles/#{id}"
     headers = HTTP::Headers{"User-Agent" => "CrystalAggregator/1.0"}
-    
+
     response = HTTP::Client.get(url, headers: headers)
-    
+
     if response.status_code == 200
       begin
         data = JSON.parse(response.body)
-        
+
         article = Hash(String, JSON::Any).new
         article["title"] = JSON::Any.new(data["title"]?.to_s || "Untitled")
         article["url"] = JSON::Any.new(data["url"]?.to_s || "")
@@ -328,7 +328,7 @@ module DevToFetcher
         article["score"] = JSON::Any.new(data["positive_reactions_count"]?.try &.as_i || 0)
         article["comment_count"] = JSON::Any.new(data["comments_count"]?.try &.as_i || 0)
         article["is_user_post"] = JSON::Any.new(false)
-        
+
         article
       rescue e : Exception
         puts "Failed to parse article #{id}: #{e.message}"
@@ -342,14 +342,14 @@ module DevToFetcher
     puts "Error fetching article #{id}: #{e.message}"
     nil
   end
-  
+
   # Search articles by query
   def self.search_articles(query : String, limit : Int32 = DEFAULT_LIMIT) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/articles?search=#{URI.encode_path(query)}&per_page=#{limit}"
     headers = HTTP::Headers{"User-Agent" => "CrystalAggregator/1.0"}
-    
+
     response = HTTP::Client.get(url, headers: headers)
-    
+
     if response.status_code == 200
       parse_articles_response(response.body)
     else

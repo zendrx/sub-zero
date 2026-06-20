@@ -233,7 +233,7 @@
       <nav class="nav">
         <a href="/" class="active">Home</a>
         <a href="/search">Search</a>
-        <% if logged_in? %>
+        <% if logged_in?(env) %>
           <a href="/settings">Settings</a>
           <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
         <% else %>
@@ -255,7 +255,7 @@
       <button class="feed-btn" :class="{ active: currentFeed === 'hot' }" @click="changeFeed('hot')">Hot</button>
       <button class="feed-btn" :class="{ active: currentFeed === 'new' }" @click="changeFeed('new')">New</button>
       <button class="feed-btn" :class="{ active: currentFeed === 'top' }" @click="changeFeed('top')">Top</button>
-      <% if logged_in? %>
+      <% if logged_in?(env) %>
         <button class="feed-btn" :class="{ active: currentFeed === 'personalized' }" @click="changeFeed('personalized')">For You</button>
         <button class="feed-btn" :class="{ active: currentFeed === 'trending' }" @click="changeFeed('trending')">Trending</button>
       <% end %>
@@ -279,7 +279,7 @@
               <span class="post-source" :class="post.source" x-text="post.source"></span>
               <span x-text="timeAgo(post.created_at)"></span>
               <a :href="'/post/' + post.id" class="post-comments" x-text="post.comment_count + ' comments'"></a>
-              <% if logged_in? %>
+              <% if logged_in?(env) %>
                 <button class="save-btn" @click="savePost(post.id)" x-text="post.saved ? 'Unsave' : 'Save'"></button>
               <% end %>
             </div>
@@ -318,7 +318,7 @@
         loading: true,
         loadingMore: false,
         hasMore: true,
-        currentUser: <%= logged_in? ? "true" : "false" %>,
+        currentUser: <%= logged_in?(env) ? "true" : "false" %>,
 
         init() {
           // Get feed from URL path

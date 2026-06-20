@@ -7,19 +7,19 @@ require "json"
 module HNFetcher
   # Hacker News API endpoints
   BASE_URL = "https://hacker-news.firebaseio.com/v0"
-  
+
   # Number of stories to fetch
   DEFAULT_LIMIT = 30
-  
+
   # Story types available
   STORY_TYPES = ["topstories", "newstories", "beststories", "askstories", "showstories", "jobstories"]
-  
+
   # Fetches story IDs from a specific endpoint
   def self.fetch_story_ids(endpoint : String, limit : Int32 = DEFAULT_LIMIT) : Array(Int64)
     url = "#{BASE_URL}/#{endpoint}.json"
-    
+
     response = HTTP::Client.get(url)
-    
+
     if response.status_code == 200
       begin
         ids = JSON.parse(response.body).as_a.map(&.as_i64)
@@ -36,20 +36,20 @@ module HNFetcher
     puts "Error fetching story IDs: #{e.message}"
     [] of Int64
   end
-  
+
   # Fetches a single story by ID
   def self.fetch_story(id : Int64) : Hash(String, JSON::Any)?
     url = "#{BASE_URL}/item/#{id}.json"
-    
+
     response = HTTP::Client.get(url)
-    
+
     if response.status_code == 200
       begin
         data = JSON.parse(response.body)
-        
+
         # Skip if it's not a story (could be comment, poll, etc.)
         return nil if data["type"]?.to_s != "story"
-        
+
         # Extract story information
         title = data["title"]?.to_s || "Untitled"
         url = data["url"]?.to_s || ""
@@ -60,11 +60,11 @@ module HNFetcher
         time = data["time"]?.try &.as_i || 0
         text = data["text"]?.to_s || ""
         story_type = data["type"]?.to_s || "story"
-        
+
         # Determine if it's a text post or link post
         is_self = text.empty? ? false : true
         content = is_self ? text : ""
-        
+
         # Build story hash using JSON::Any
         story = Hash(String, JSON::Any).new
         story["title"] = JSON::Any.new(title)
@@ -79,7 +79,7 @@ module HNFetcher
         story["created_utc"] = JSON::Any.new(time)
         story["story_type"] = JSON::Any.new(story_type)
         story["is_user_post"] = JSON::Any.new(false)
-        
+
         story
       rescue e : Exception
         puts "Failed to parse story #{id}: #{e.message}"
@@ -93,22 +93,22 @@ module HNFetcher
     puts "Error fetching story #{id}: #{e.message}"
     nil
   end
-  
+
   # Fetches multiple stories by IDs
   def self.fetch_stories(ids : Array(Int64)) : Array(Hash(String, JSON::Any))
     stories = [] of Hash(String, JSON::Any)
-    
+
     begin
       # Use fibers for concurrent fetching
       channels = ids.map { Channel(Hash(String, JSON::Any)?).new }
-      
+
       ids.each_with_index do |id, index|
         spawn do
           story = fetch_story(id)
           channels[index].send(story)
         end
       end
-      
+
       # Collect results
       ids.each_with_index do |id, index|
         story = channels[index].receive
@@ -119,24 +119,24 @@ module HNFetcher
     rescue e : Exception
       puts "Error fetching multiple stories: #{e.message}"
     end
-    
+
     stories
   end
-  
+
   # Saves fetched stories to the database, skipping duplicates
   def self.save_stories_to_db(stories : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
-    
+
     stories.each do |story|
       external_id = story["external_id"]?.to_s
       next if external_id.empty?
-      
+
       # Check if story already exists
       result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'hackernews'",
         external_id
       )
-      
+
       if !result.move_next
         # Insert new story
         POOL.exec(
@@ -153,13 +153,13 @@ module HNFetcher
         saved_count += 1
       end
     end
-    
+
     saved_count
   rescue e : PG::Error
     puts "Database error while saving stories: #{e.message}"
     0
   end
-  
+
   # Fetches top stories
   def self.fetch_top_stories(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching top stories from Hacker News..."
@@ -172,7 +172,7 @@ module HNFetcher
     puts "Error fetching top stories: #{e.message}"
     0
   end
-  
+
   # Fetches new stories
   def self.fetch_new_stories(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching new stories from Hacker News..."
@@ -185,7 +185,7 @@ module HNFetcher
     puts "Error fetching new stories: #{e.message}"
     0
   end
-  
+
   # Fetches best stories (highest ranking)
   def self.fetch_best_stories(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching best stories from Hacker News..."
@@ -198,7 +198,7 @@ module HNFetcher
     puts "Error fetching best stories: #{e.message}"
     0
   end
-  
+
   # Fetches Ask HN stories
   def self.fetch_ask_stories(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching Ask HN stories..."
@@ -211,7 +211,7 @@ module HNFetcher
     puts "Error fetching Ask HN stories: #{e.message}"
     0
   end
-  
+
   # Fetches Show HN stories
   def self.fetch_show_stories(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "Fetching Show HN stories..."
@@ -224,26 +224,26 @@ module HNFetcher
     puts "Error fetching Show HN stories: #{e.message}"
     0
   end
-  
+
   # Full fetch routine that combines multiple story types
   def self.full_fetch
     puts "Starting full Hacker News fetch..."
-    
+
     # Fetch top stories
     saved_top = fetch_top_stories(30)
-    
+
     # Fetch new stories
     saved_new = fetch_new_stories(20)
-    
+
     # Fetch best stories
     saved_best = fetch_best_stories(20)
-    
+
     # Fetch Ask HN
     saved_ask = fetch_ask_stories(15)
-    
+
     # Fetch Show HN
     saved_show = fetch_show_stories(15)
-    
+
     total = saved_top + saved_new + saved_best + saved_ask + saved_show
     puts "Hacker News fetch complete. Total saved: #{total} stories"
     total
@@ -251,25 +251,25 @@ module HNFetcher
     puts "Full fetch failed: #{e.message}"
     0
   end
-  
+
   # Fetches comments for a specific story
   def self.fetch_story_comments(story_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/item/#{story_id}.json"
-    
+
     response = HTTP::Client.get(url)
-    
+
     if response.status_code == 200
       begin
         data = JSON.parse(response.body)
         comments = [] of Hash(String, JSON::Any)
-        
+
         if kids = data["kids"]?
           kids.as_a.first(limit).each do |kid|
             comment = fetch_comment(kid.as_i64)
             comments << comment if comment
           end
         end
-        
+
         comments
       rescue e : Exception
         puts "Failed to fetch story comments: #{e.message}"
@@ -283,26 +283,26 @@ module HNFetcher
     puts "Error fetching story comments: #{e.message}"
     [] of Hash(String, JSON::Any)
   end
-  
+
   # Fetches a single comment by ID
   def self.fetch_comment(id : Int64) : Hash(String, JSON::Any)?
     url = "#{BASE_URL}/item/#{id}.json"
-    
+
     response = HTTP::Client.get(url)
-    
+
     if response.status_code == 200
       begin
         data = JSON.parse(response.body)
-        
+
         return nil if data["type"]?.to_s != "comment"
-        
+
         comment = Hash(String, JSON::Any).new
         comment["id"] = JSON::Any.new(data["id"]?.try &.as_i64 || 0)
         comment["by"] = JSON::Any.new(data["by"]?.to_s || "")
         comment["text"] = JSON::Any.new(data["text"]?.to_s || "")
         comment["time"] = JSON::Any.new(data["time"]?.try &.as_i || 0)
         comment["parent"] = JSON::Any.new(data["parent"]?.try &.as_i64 || 0)
-        
+
         comment
       rescue e : Exception
         puts "Failed to parse comment #{id}: #{e.message}"

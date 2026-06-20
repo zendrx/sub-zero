@@ -16,7 +16,7 @@ module RecommendationEngine
   end
 
   # Get feed based on type - explicit return for each branch
-  def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
+  def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot,
                     limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     if feed_type == FeedType::Hot
       return get_hot_feed(limit, offset)
@@ -65,7 +65,7 @@ module RecommendationEngine
        LIMIT $1 OFFSET $2",
       limit, offset
     )
-    
+
     posts = [] of Hash(String, JSON::Any)
     result.each do
       post = Hash(String, JSON::Any).new
@@ -99,7 +99,7 @@ module RecommendationEngine
        LIMIT $1 OFFSET $2",
       limit, offset
     )
-    
+
     posts = [] of Hash(String, JSON::Any)
     result.each do
       post = Hash(String, JSON::Any).new
@@ -133,7 +133,7 @@ module RecommendationEngine
        LIMIT $1 OFFSET $2",
       limit, offset
     )
-    
+
     posts = [] of Hash(String, JSON::Any)
     result.each do
       post = Hash(String, JSON::Any).new
@@ -161,7 +161,7 @@ module RecommendationEngine
   def self.get_personalized_feed(user_id : Int64, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     source_scores = AlgoDB.get_user_source_preferences(user_id)
     tag_scores = AlgoDB.get_user_tag_preferences(user_id)
-    
+
     result = POOL.query(
       "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
        FROM posts
@@ -173,7 +173,7 @@ module RecommendationEngine
        LIMIT $2 OFFSET $3",
       user_id, limit * 2, offset
     )
-    
+
     scored_posts = [] of Tuple(Float64, Hash(String, JSON::Any))
     result.each do
       post = Hash(String, JSON::Any).new
@@ -191,11 +191,11 @@ module RecommendationEngine
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
       post["upvotes"] = JSON::Any.new(result.read(Int32))
       post["downvotes"] = JSON::Any.new(result.read(Int32))
-      
+
       score = calculate_personalized_score(post, source_scores, tag_scores)
       scored_posts << {score, post}
     end
-    
+
     scored_posts.sort! { |a, b| b[0] <=> a[0] }
     scored_posts.first(limit).map do |_, post|
       post.merge({"feed_type" => JSON::Any.new("personalized")})
@@ -207,22 +207,22 @@ module RecommendationEngine
                                         source_scores : Hash(String, Float64),
                                         tag_scores : Hash(String, Float64)) : Float64
     base_score = Math.log([post["score"].as_i64.to_f, 1].max) / 10.0
-    
+
     source = post["source"].as_s
     source_boost = source_scores[source]? || 0.0
     normalized_source = Math.tanh(source_boost / 10.0)
-    
+
     tags = AlgoDB.extract_tags_from_text(post["title"].as_s)
     tag_boost = 0.0
     tags.each do |tag|
       tag_boost += tag_scores[tag]? || 0.0
     end
     normalized_tag = Math.tanh((tag_boost / [tags.size, 1].max) / 10.0)
-    
+
     created_at = Time.parse(post["created_at"].as_s, "%Y-%m-%d %H:%M:%S", Time::Location::UTC)
     hours = (Time.utc - created_at).total_hours
     time_boost = 1.0 / (1.0 + hours / 72.0)
-    
+
     final_score = (base_score * 0.3) + (normalized_source * 0.35) + (normalized_tag * 0.25) + (time_boost * 0.1)
     final_score.clamp(0.0, 1.0)
   end
@@ -245,12 +245,12 @@ module RecommendationEngine
   # Mixed feed - combines multiple feed types
   def self.get_mixed_feed(user_id : Int64, limit : Int32 = 50) : Array(Hash(String, JSON::Any))
     feeds = [] of Array(Hash(String, JSON::Any))
-    
+
     feeds << get_hot_feed(limit // 4, 0)
     feeds << get_personalized_feed(user_id, limit // 4, 0)
     feeds << get_trending_feed(limit // 4)
     feeds << get_collaborative_feed(user_id, limit // 4)
-    
+
     combined = feeds.flatten
     combined.shuffle(random: Random.new(Time.utc.to_unix))
     combined.first(limit).map do |post|

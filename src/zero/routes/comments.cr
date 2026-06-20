@@ -6,7 +6,7 @@ require "kemal"
 # Comment creation params
 struct CommentParams
   include JSON::Serializable
-  
+
   property post_id : Int64
   property content : String
   property parent_id : Int64?
@@ -24,15 +24,15 @@ end
 # Create a new comment
 post "/api/comments" do |env|
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
-  
+
   if !valid || !user_id
     env.response.status_code = 401
     next {
       "status"  => "error",
-      "message" => "Authentication required"
+      "message" => "Authentication required",
     }.to_json
   end
-  
+
   begin
     # Parse JSON body into typed struct - handle nil body
     body = env.request.body
@@ -40,65 +40,65 @@ post "/api/comments" do |env|
       env.response.status_code = 400
       next {
         "status"  => "error",
-        "message" => "Request body is empty"
+        "message" => "Request body is empty",
       }.to_json
     end
-    
+
     params = CommentParams.from_json(body)
-    
+
     if params.content.empty?
       env.response.status_code = 400
       next {
         "status"  => "error",
-        "message" => "Comment content is required"
+        "message" => "Comment content is required",
       }.to_json
     end
-    
+
     if params.content.size > 10000
       env.response.status_code = 400
       next {
         "status"  => "error",
-        "message" => "Comment is too long (max 10000 characters)"
+        "message" => "Comment is too long (max 10000 characters)",
       }.to_json
     end
-    
+
     # Check if post exists
     post_result = POOL.query("SELECT id FROM posts WHERE id = $1", params.post_id)
     if !post_result.move_next
       env.response.status_code = 404
       next {
         "status"  => "error",
-        "message" => "Post not found"
+        "message" => "Post not found",
       }.to_json
     end
-    
+
     comment_id = CommentDB.create(params.post_id, user_id, params.content, params.parent_id)
-    
+
     if comment_id
       env.response.status_code = 201
       {
         "status"     => "success",
         "message"    => "Comment created successfully",
-        "comment_id" => comment_id
+        "comment_id" => comment_id,
       }.to_json
     else
       env.response.status_code = 500
       {
         "status"  => "error",
-        "message" => "Failed to create comment"
+        "message" => "Failed to create comment",
       }.to_json
     end
   rescue JSON::SerializableError
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid JSON payload"
+      "message" => "Invalid JSON payload",
     }.to_json
   rescue e : Exception
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Internal server error: #{e.message}"
+      "message" => "Internal server error: #{e.message}",
     }.to_json
   end
 end
@@ -106,25 +106,25 @@ end
 # Get a single comment by ID
 get "/api/comments/:id" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid comment ID"
+      "message" => "Invalid comment ID",
     }.to_json
   end
-  
+
   comment = CommentDB.find(id)
-  
+
   if comment.nil?
     env.response.status_code = 404
     next {
       "status"  => "error",
-      "message" => "Comment not found"
+      "message" => "Comment not found",
     }.to_json
   end
-  
+
   user_result = POOL.query(
     "SELECT username FROM users WHERE id = $1",
     comment["user_id"]
@@ -133,45 +133,45 @@ get "/api/comments/:id" do |env|
   if user_result.move_next
     username = user_result.read(String)
   end
-  
+
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   user_vote = nil
   if valid && user_id
     user_vote = VoteDB.get_comment_vote(user_id, id)
   end
-  
+
   env.response.status_code = 200
   {
-    "status" => "success",
+    "status"  => "success",
     "comment" => comment.merge({
-      "username"   => username,
-      "user_vote"  => user_vote
-    })
+      "username"  => username,
+      "user_vote" => user_vote,
+    }),
   }.to_json
 end
 
 # Edit a comment (only author or admin)
 put "/api/comments/:id" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid comment ID"
+      "message" => "Invalid comment ID",
     }.to_json
   end
-  
+
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
-  
+
   if !valid || !user_id
     env.response.status_code = 401
     next {
       "status"  => "error",
-      "message" => "Authentication required"
+      "message" => "Authentication required",
     }.to_json
   end
-  
+
   result = POOL.query(
     "SELECT user_id FROM comments WHERE id = $1",
     id
@@ -180,70 +180,70 @@ put "/api/comments/:id" do |env|
     env.response.status_code = 404
     next {
       "status"  => "error",
-      "message" => "Comment not found"
+      "message" => "Comment not found",
     }.to_json
   end
-  
+
   comment_user_id = result.read(Int64)
-  
+
   is_admin = Auth.is_admin?(user_id)
   if comment_user_id != user_id && !is_admin
     env.response.status_code = 403
     next {
       "status"  => "error",
-      "message" => "You don't have permission to edit this comment"
+      "message" => "You don't have permission to edit this comment",
     }.to_json
   end
-  
+
   begin
     body = env.request.body
     if body.nil?
       env.response.status_code = 400
       next {
         "status"  => "error",
-        "message" => "Request body is empty"
+        "message" => "Request body is empty",
       }.to_json
     end
-    
+
     params = CommentParams.from_json(body)
-    
+
     if params.content.empty?
       env.response.status_code = 400
       next {
         "status"  => "error",
-        "message" => "Comment content is required"
+        "message" => "Comment content is required",
       }.to_json
     end
-    
+
     if params.content.size > 10000
       env.response.status_code = 400
       next {
         "status"  => "error",
-        "message" => "Comment is too long (max 10000 characters)"
+        "message" => "Comment is too long (max 10000 characters)",
       }.to_json
     end
-    
+
     POOL.exec(
       "UPDATE comments SET content = $1, updated_at = NOW() WHERE id = $2",
       params.content, id
     )
-    
+
     env.response.status_code = 200
     {
       "status"  => "success",
-      "message" => "Comment updated successfully"
+      "message" => "Comment updated successfully",
     }.to_json
   rescue JSON::SerializableError
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid JSON payload"
+      "message" => "Invalid JSON payload",
     }.to_json
   rescue e : Exception
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Internal server error"
+      "message" => "Internal server error",
     }.to_json
   end
 end
@@ -251,25 +251,25 @@ end
 # Delete a comment (only author or admin)
 delete "/api/comments/:id" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid comment ID"
+      "message" => "Invalid comment ID",
     }.to_json
   end
-  
+
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
-  
+
   if !valid || !user_id
     env.response.status_code = 401
     next {
       "status"  => "error",
-      "message" => "Authentication required"
+      "message" => "Authentication required",
     }.to_json
   end
-  
+
   result = POOL.query(
     "SELECT user_id, post_id FROM comments WHERE id = $1",
     id
@@ -278,79 +278,79 @@ delete "/api/comments/:id" do |env|
     env.response.status_code = 404
     next {
       "status"  => "error",
-      "message" => "Comment not found"
+      "message" => "Comment not found",
     }.to_json
   end
-  
+
   comment_user_id = result.read(Int64)
   post_id = result.read(Int64)
-  
+
   is_admin = Auth.is_admin?(user_id)
   if comment_user_id != user_id && !is_admin
     env.response.status_code = 403
     next {
       "status"  => "error",
-      "message" => "You don't have permission to delete this comment"
+      "message" => "You don't have permission to delete this comment",
     }.to_json
   end
-  
+
   POOL.exec("DELETE FROM comments WHERE id = $1", id)
-  
+
   if post_id
     PostDB.update_comment_count(post_id)
   end
-  
+
   env.response.status_code = 200
   {
     "status"  => "success",
-    "message" => "Comment deleted successfully"
+    "message" => "Comment deleted successfully",
   }.to_json
 end
 
 # Upvote a comment
 post "/api/comments/:id/upvote" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid comment ID"
+      "message" => "Invalid comment ID",
     }.to_json
   end
-  
+
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
-  
+
   if !valid || !user_id
     env.response.status_code = 401
     next {
       "status"  => "error",
-      "message" => "Authentication required"
+      "message" => "Authentication required",
     }.to_json
   end
-  
+
   result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
   if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
-      "message" => "Comment not found"
+      "message" => "Comment not found",
     }.to_json
   end
-  
+
   success = VoteDB.cast_comment_vote(user_id, id, 1)
-  
+
   if success
     env.response.status_code = 200
     {
       "status"  => "success",
-      "message" => "Comment upvoted successfully"
+      "message" => "Comment upvoted successfully",
     }.to_json
   else
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Failed to cast vote"
+      "message" => "Failed to cast vote",
     }.to_json
   end
 end
@@ -358,47 +358,47 @@ end
 # Downvote a comment
 post "/api/comments/:id/downvote" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid comment ID"
+      "message" => "Invalid comment ID",
     }.to_json
   end
-  
+
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
-  
+
   if !valid || !user_id
     env.response.status_code = 401
     next {
       "status"  => "error",
-      "message" => "Authentication required"
+      "message" => "Authentication required",
     }.to_json
   end
-  
+
   result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
   if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
-      "message" => "Comment not found"
+      "message" => "Comment not found",
     }.to_json
   end
-  
+
   success = VoteDB.cast_comment_vote(user_id, id, -1)
-  
+
   if success
     env.response.status_code = 200
     {
       "status"  => "success",
-      "message" => "Comment downvoted successfully"
+      "message" => "Comment downvoted successfully",
     }.to_json
   else
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Failed to cast vote"
+      "message" => "Failed to cast vote",
     }.to_json
   end
 end
@@ -406,22 +406,22 @@ end
 # Get comment replies (nested comments)
 get "/api/comments/:id/replies" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid comment ID"
+      "message" => "Invalid comment ID",
     }.to_json
   end
-  
+
   limit = env.params.query["limit"]?.try &.to_i || 20
   offset = env.params.query["offset"]?.try &.to_i || 0
-  
+
   if limit > 100
     limit = 100
   end
-  
+
   result = POOL.query(
     "SELECT c.id, c.user_id, c.content, c.score, c.created_at,
             u.username
@@ -432,7 +432,7 @@ get "/api/comments/:id/replies" do |env|
      LIMIT $2 OFFSET $3",
     id, limit, offset
   )
-  
+
   replies = [] of Hash(String, JSON::Any)
   result.each do
     reply = Hash(String, JSON::Any).new
@@ -454,39 +454,39 @@ get "/api/comments/:id/replies" do |env|
     end
     replies << reply
   end
-  
+
   env.response.status_code = 200
   {
-    "status" => "success",
+    "status"     => "success",
     "comment_id" => id,
-    "results" => replies,
+    "results"    => replies,
     "pagination" => {
       "limit"  => limit,
       "offset" => offset,
-      "count"  => replies.size
-    }
+      "count"  => replies.size,
+    },
   }.to_json
 end
 
 # Get comments by user
 get "/api/comments/user/:user_id" do |env|
   user_id = env.params.url["user_id"].to_i64?
-  
+
   if user_id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid user ID"
+      "message" => "Invalid user ID",
     }.to_json
   end
-  
+
   limit = env.params.query["limit"]?.try &.to_i || 50
   offset = env.params.query["offset"]?.try &.to_i || 0
-  
+
   if limit > 100
     limit = 100
   end
-  
+
   result = POOL.query(
     "SELECT c.id, c.post_id, c.content, c.score, c.created_at,
             p.title as post_title
@@ -497,7 +497,7 @@ get "/api/comments/user/:user_id" do |env|
      LIMIT $2 OFFSET $3",
     user_id, limit, offset
   )
-  
+
   comments = [] of Hash(String, JSON::Any)
   result.each do
     comment = Hash(String, JSON::Any).new
@@ -514,43 +514,43 @@ get "/api/comments/user/:user_id" do |env|
     end
     comments << comment
   end
-  
+
   env.response.status_code = 200
   {
-    "status" => "success",
-    "user_id" => user_id,
-    "results" => comments,
+    "status"     => "success",
+    "user_id"    => user_id,
+    "results"    => comments,
     "pagination" => {
       "limit"  => limit,
       "offset" => offset,
-      "count"  => comments.size
-    }
+      "count"  => comments.size,
+    },
   }.to_json
 end
 
 # Get comment count for a post
 get "/api/posts/:id/comment-count" do |env|
   id = env.params.url["id"].to_i64?
-  
+
   if id.nil?
     env.response.status_code = 400
     next {
       "status"  => "error",
-      "message" => "Invalid post ID"
+      "message" => "Invalid post ID",
     }.to_json
   end
-  
+
   result = POOL.query(
     "SELECT COUNT(*) FROM comments WHERE post_id = $1",
     id
   )
   result.move_next
   count = result.read(Int64)
-  
+
   env.response.status_code = 200
   {
-    "status" => "success",
-    "post_id" => id,
-    "comment_count" => count
+    "status"        => "success",
+    "post_id"       => id,
+    "comment_count" => count,
   }.to_json
 end

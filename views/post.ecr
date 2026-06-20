@@ -298,7 +298,7 @@
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/search">Search</a>
-        <% if logged_in? %>
+        <% if logged_in?(env) %>
           <a href="/settings">Settings</a>
           <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
         <% else %>
@@ -330,7 +330,7 @@
             <span class="post-source" :class="post.source" x-text="post.source"></span>
             <span x-text="timeAgo(post.created_at)"></span>
             <span x-text="post.comment_count + ' comments'"></span>
-            <% if logged_in? %>
+            <% if logged_in?(env) %>
               <button class="save-btn" @click="savePost" x-text="post.saved ? 'Unsave' : 'Save'"></button>
             <% end %>
           </div>
@@ -350,7 +350,7 @@
       <h2 x-text="post.comment_count + ' comments'"></h2>
 
       <!-- Comment form -->
-      <% if logged_in? %>
+      <% if logged_in?(env) %>
         <div class="comment-form">
           <textarea x-model="newComment" placeholder="Write a comment..." rows="3"></textarea>
           <button class="btn-submit" @click="submitComment" :disabled="commentLoading || !newComment.trim()">
@@ -428,7 +428,7 @@
         replyTo: null,
         replyContent: '',
         replyLoading: false,
-        currentUser: <%= logged_in? ? "true" : "false" %>,
+        currentUser: <%= logged_in?(env) ? "true" : "false" %>,
 
         loadPost() {
           this.loading = true;

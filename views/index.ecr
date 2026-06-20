@@ -255,7 +255,7 @@
         <a href="/feed/new">New</a>
         <a href="/feed/top">Top</a>
         <a href="/search">Search</a>
-        <% if logged_in? %>
+        <% if logged_in?(env) %>
           <a href="/settings">Settings</a>
           <a href="/logout" hx-post="/api/auth/logout" hx-confirm="Logout?">Logout</a>
         <% else %>
@@ -273,7 +273,7 @@
       <h1>❄️ Sub Zero</h1>
       <p>Curated content from Reddit, Hacker News & Dev.to — all in one place.</p>
       <div class="cta-buttons">
-        <% if logged_in? %>
+        <% if logged_in?(env) %>
           <a href="/settings" class="btn-large primary">Your Feed</a>
         <% else %>
           <a href="/signup" class="btn-large primary">Get Started</a>
@@ -287,7 +287,7 @@
       <button class="feed-btn" data-feed="hot">Hot</button>
       <button class="feed-btn" data-feed="new">New</button>
       <button class="feed-btn" data-feed="top">Top</button>
-      <% if logged_in? %>
+      <% if logged_in?(env) %>
         <button class="feed-btn" data-feed="personalized">For You</button>
         <button class="feed-btn" data-feed="trending">Trending</button>
       <% end %>
@@ -307,7 +307,7 @@
 
   <script>
     let currentFeed = 'mixed';
-    let currentUser = <%= logged_in? ? "true" : "false" %>;
+    let currentUser = <%= logged_in?(env) ? "true" : "false" %>;
 
     function getPosts(feed) {
       const feedEl = document.getElementById('feed');

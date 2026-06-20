@@ -7,8 +7,8 @@ require "time"
 
 module Auth
   # Configuration
-  JWT_SECRET = ENV["JWT_SECRET"]? || "your-super-secret-key-change-in-production"
-  JWT_EXPIRY_HOURS = 24
+  JWT_SECRET          = ENV["JWT_SECRET"]? || "your-super-secret-key-change-in-production"
+  JWT_EXPIRY_HOURS    = 24
   SESSION_COOKIE_NAME = "aggregator_session"
 
   # Password hashing using Crypto::Bcrypt::Password
@@ -29,7 +29,7 @@ module Auth
       "user_id"  => user_id,
       "username" => username,
       "exp"      => Time.utc + JWT_EXPIRY_HOURS.hours,
-      "iat"      => Time.utc
+      "iat"      => Time.utc,
     }
     JWT.encode(payload, JWT_SECRET, JWT::Algorithm::HS256)
   end
@@ -39,16 +39,16 @@ module Auth
     begin
       decoded = JWT.decode(token, JWT_SECRET, JWT::Algorithm::HS256)
       payload = decoded[0]
-      
+
       # Check if payload is a Hash
       return nil unless payload.is_a?(Hash(String, JSON::Any))
-      
+
       # Check expiration - handle nil safely with try
       exp = payload["exp"]?.try &.as_i64
       if exp && exp < Time.utc.to_unix
         return nil
       end
-      
+
       payload
     rescue
       nil
@@ -70,19 +70,19 @@ module Auth
     if username.empty? || email.empty? || password.empty?
       return {false, "All fields are required"}
     end
-    
+
     if username.size < 3 || username.size > 30
       return {false, "Username must be between 3 and 30 characters"}
     end
-    
+
     if email.size < 5 || !email.includes?("@") || !email.includes?(".")
       return {false, "Invalid email address"}
     end
-    
+
     if password.size < 6
       return {false, "Password must be at least 6 characters"}
     end
-    
+
     if UserDB.exists?(username, email)
       if UserDB.username_exists?(username)
         return {false, "Username already taken"}
@@ -92,10 +92,10 @@ module Auth
       end
       return {false, "Username or email already exists"}
     end
-    
+
     password_hash = hash_password(password)
     user_id = UserDB.create(username, email, password_hash)
-    
+
     if user_id
       {true, user_id}
     else
@@ -109,29 +109,29 @@ module Auth
     if !user
       user = UserDB.find_by_email(identifier)
     end
-    
+
     if !user
       return {false, "Invalid username or password"}
     end
-    
+
     password_hash = user["password_hash"].as_s
     if !verify_password(password, password_hash)
       return {false, "Invalid username or password"}
     end
-    
+
     UserDB.update_last_login(user["id"].as_i64)
-    
+
     token = generate_token(user["id"].as_i64, user["username"].as_s)
-    
+
     user_data = {
       "id"         => user["id"],
       "username"   => user["username"],
       "email"      => user["email"],
       "created_at" => user["created_at"],
       "is_admin"   => user["is_admin"],
-      "token"      => JSON::Any.new(token)
+      "token"      => JSON::Any.new(token),
     }
-    
+
     {true, user_data}
   end
 
@@ -142,14 +142,14 @@ module Auth
       token = auth_header[7..-1]
       return validate_token(token)
     end
-    
+
     if cookies
       cookie = cookies[SESSION_COOKIE_NAME]?
       if cookie
         return validate_token(cookie.value)
       end
     end
-    
+
     {false, nil, nil}
   end
 
@@ -159,17 +159,17 @@ module Auth
     if !payload
       return {false, nil, nil}
     end
-    
+
     user_id = payload["user_id"]?.try &.as_i64
     if !user_id
       return {false, nil, nil}
     end
-    
+
     user = UserDB.find(user_id)
     if !user
       return {false, nil, nil}
     end
-    
+
     {true, user_id, user}
   end
 
@@ -222,7 +222,7 @@ module Auth
     if !user
       return {false, "User not found"}
     end
-    
+
     result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
@@ -235,17 +235,17 @@ module Auth
     else
       return {false, "User not found"}
     end
-    
+
     if new_password.size < 6
       return {false, "New password must be at least 6 characters"}
     end
-    
+
     new_hash = hash_password(new_password)
     POOL.exec(
       "UPDATE users SET password_hash = $1 WHERE id = $2",
       new_hash, user_id
     )
-    
+
     {true, "Password changed successfully"}
   rescue e : PG::Error
     {false, "Database error: #{e.message}"}
@@ -257,7 +257,7 @@ module Auth
     if !user
       return {false, "User not found"}
     end
-    
+
     result = POOL.query(
       "SELECT password_hash FROM users WHERE id = $1",
       user_id
@@ -270,20 +270,20 @@ module Auth
     else
       return {false, "User not found"}
     end
-    
+
     if new_email.empty? || !new_email.includes?("@")
       return {false, "Invalid email address"}
     end
-    
+
     if UserDB.email_exists?(new_email) && UserDB.find_by_email(new_email)["id"].as_i64 != user_id
       return {false, "Email already in use"}
     end
-    
+
     POOL.exec(
       "UPDATE users SET email = $1 WHERE id = $2",
       new_email, user_id
     )
-    
+
     {true, "Email changed successfully"}
   rescue e : PG::Error
     {false, "Database error: #{e.message}"}
@@ -303,9 +303,9 @@ module Auth
     else
       return {false, "User not found"}
     end
-    
+
     POOL.exec("DELETE FROM users WHERE id = $1", user_id)
-    
+
     {true, "Account deleted successfully"}
   rescue e : PG::Error
     {false, "Database error: #{e.message}"}
@@ -320,14 +320,14 @@ module Auth
   # Require authentication middleware
   def self.require_auth(context : HTTP::Server::Context)
     valid, user_id, user = validate_session(context.request.headers, context.request.cookies)
-    
+
     if !valid || !user_id
       context.response.status_code = 401
       context.response.content_type = "application/json"
       context.response.print %({"error":"Authentication required"})
       return false
     end
-    
+
     context.set("current_user", user)
     context.set("current_user_id", user_id)
     true
@@ -336,21 +336,21 @@ module Auth
   # Require admin middleware
   def self.require_admin(context : HTTP::Server::Context)
     valid, user_id, user = validate_session(context.request.headers, context.request.cookies)
-    
+
     if !valid || !user_id
       context.response.status_code = 401
       context.response.content_type = "application/json"
       context.response.print %({"error":"Authentication required"})
       return false
     end
-    
+
     if !is_admin?(user_id)
       context.response.status_code = 403
       context.response.content_type = "application/json"
       context.response.print %({"error":"Admin privileges required"})
       return false
     end
-    
+
     context.set("current_user", user)
     context.set("current_user_id", user_id)
     true
