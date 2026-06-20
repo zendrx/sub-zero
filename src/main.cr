@@ -38,74 +38,58 @@ require "./zero/algo/*"
 require "./zero/aggregate/*"
 require "./zero/auth"
 
-# Start Reddit fetcher scheduler
 def start_reddit_scheduler
   spawn do
     loop do
       begin
-        puts "Starting scheduled Reddit fetch..."
+        puts "🔄 Reddit: Starting fetch..."
         saved = RedditFetcher.full_fetch
-        if saved > 0
-          puts "Saved #{saved} Reddit posts"
-        end
-        puts "Scheduled Reddit fetch complete. Next fetch in 5 minutes."
-        sleep 5.minutes
+        puts "✅ Reddit: Saved #{saved} posts"
       rescue e : Exception
-        puts "Reddit scheduler error: #{e.message}"
-        sleep 5.minutes
+        puts "❌ Reddit scheduler error: #{e.message}"
       end
+      sleep 5.minutes
     end
   end
 end
 
-# Start Hacker News fetcher scheduler
 def start_hn_scheduler
   spawn do
     loop do
       begin
-        puts "Starting scheduled Hacker News fetch..."
+        puts "🔄 HN: Starting fetch..."
         saved = HNFetcher.full_fetch
-        if saved > 0
-          puts "Saved #{saved} Hacker News stories"
-        end
-        puts "Scheduled Hacker News fetch complete. Next fetch in 10 minutes."
-        sleep 10.minutes
+        puts "✅ HN: Saved #{saved} stories"
       rescue e : Exception
-        puts "Hacker News scheduler error: #{e.message}"
-        sleep 10.minutes
+        puts "❌ HN scheduler error: #{e.message}"
       end
+      sleep 10.minutes
     end
   end
 end
 
-# Start Dev.to fetcher scheduler
 def start_devto_scheduler
   spawn do
     loop do
       begin
-        puts "Starting scheduled Dev.to fetch..."
+        puts "🔄 Dev.to: Starting fetch..."
         saved = DevToFetcher.full_fetch
-        if saved > 0
-          puts "Saved #{saved} Dev.to articles"
-        end
-        puts "Scheduled Dev.to fetch complete. Next fetch in 15 minutes."
-        sleep 15.minutes
+        puts "✅ Dev.to: Saved #{saved} articles"
       rescue e : Exception
-        puts "Dev.to scheduler error: #{e.message}"
-        sleep 15.minutes
+        puts "❌ Dev.to scheduler error: #{e.message}"
       end
+      sleep 15.minutes
     end
   end
 end
 
-# Start prune scheduler (runs every 5 days)
 def start_prune_scheduler
   spawn do
     loop do
       sleep 5.days.total_seconds
-      puts "Running scheduled prune (every 5 days)..."
+      puts "🧹 Running scheduled prune (every 5 days)..."
       pruned = PostDB.prune_old_posts(50000)
-      puts "Pruned #{pruned} old external posts" if pruned > 0
+      puts "🧹 Pruned #{pruned} old external posts" if pruned > 0
     end
   end
 end
@@ -128,10 +112,10 @@ end
 begin
   setup_database
   setup_algo_tables
-  puts "Database tables verified"
+  puts "✅ Database tables verified"
 rescue e : Exception
-  puts "Database setup error: #{e.message}"
-  puts "Make sure PostgreSQL is running and DATABASE_URL is set correctly"
+  puts "❌ Database setup error: #{e.message}"
+  puts "💡 Make sure PostgreSQL is running and DATABASE_URL is set correctly"
   exit(1)
 end
 
@@ -144,7 +128,6 @@ get "/health" do |env|
   }.to_json
 end
 
-# Helper functions for views
 def logged_in?(env)
   value = env.get("logged_in")
   value.is_a?(Bool) ? value : false
@@ -163,7 +146,6 @@ def current_user(env)
   end
 end
 
-# Flash helper for views - parses JSON string back to hash
 def flash(env)
   value = env.get("flash")
   if value.is_a?(String)
@@ -181,7 +163,7 @@ get "/" do |env|
   valid, user_id, user = Auth.validate_session(env.request.headers, env.request.cookies)
   env.set "logged_in", valid && user_id ? true : false
   env.set "current_user", user.to_json
-  env.set "flash", "{}"  # Empty flash as JSON string
+  env.set "flash", "{}"
   render "views/index.ecr"
 end
 
