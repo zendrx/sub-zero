@@ -44,7 +44,7 @@ post "/api/auth/login" do |env|
     result = Auth.login(identifier, password)
     
     if result[0] == true
-      user_data = result[1].as(Hash(String, JSON::Type))
+      user_data = result[1].as(Hash(String, JSON::Any))
       token = user_data["token"].to_s
       
       cookie = Auth.session_cookie(token)
