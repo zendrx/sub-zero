@@ -3,16 +3,13 @@
 require "json"
 require "kemal"
 
-# Helper to safely get a JSON value
-def safe_json_value(value : JSON::Any?) : JSON::Any?
-  return nil if value.nil?
+# Comment creation params
+struct CommentParams
+  include JSON::Serializable
   
-  # If it's an array, take the first element
-  if value.is_a?(Array(JSON::Any))
-    value.first?
-  else
-    value
-  end
+  property post_id : Int64
+  property content : String
+  property parent_id : Int64?
 end
 
 # Create a new comment
@@ -28,23 +25,10 @@ post "/api/comments" do |env|
   end
   
   begin
-    # Get the JSON params hash
-    json_params = env.params.json
+    # Parse JSON body into typed struct
+    params = CommentParams.from_json(env.request.body)
     
-    # Extract values safely using as?(Type)
-    post_id = json_params["post_id"]?.try &.as_i64
-    content = json_params["content"]?.try &.as_s || ""
-    parent_id = json_params["parent_id"]?.try &.as_i64
-    
-    if post_id.nil?
-      env.response.status_code = 400
-      next {
-        "status"  => "error",
-        "message" => "Post ID is required"
-      }.to_json
-    end
-    
-    if content.empty?
+    if params.content.empty?
       env.response.status_code = 400
       next {
         "status"  => "error",
@@ -52,7 +36,7 @@ post "/api/comments" do |env|
       }.to_json
     end
     
-    if content.size > 10000
+    if params.content.size > 10000
       env.response.status_code = 400
       next {
         "status"  => "error",
@@ -60,8 +44,8 @@ post "/api/comments" do |env|
       }.to_json
     end
     
-    # Check if post exists using query (not exec)
-    post_result = POOL.query("SELECT id FROM posts WHERE id = $1", post_id)
+    # Check if post exists
+    post_result = POOL.query("SELECT id FROM posts WHERE id = $1", params.post_id)
     if !post_result.move_next
       env.response.status_code = 404
       next {
@@ -70,7 +54,7 @@ post "/api/comments" do |env|
       }.to_json
     end
     
-    comment_id = CommentDB.create(post_id, user_id, content, parent_id)
+    comment_id = CommentDB.create(params.post_id, user_id, params.content, params.parent_id)
     
     if comment_id
       env.response.status_code = 201
@@ -86,6 +70,12 @@ post "/api/comments" do |env|
         "message" => "Failed to create comment"
       }.to_json
     end
+  rescue JSON::SerializableError
+    env.response.status_code = 400
+    next {
+      "status"  => "error",
+      "message" => "Invalid JSON payload"
+    }.to_json
   rescue e : Exception
     env.response.status_code = 500
     {
@@ -188,9 +178,10 @@ put "/api/comments/:id" do |env|
   end
   
   begin
-    content = env.params.json["content"]?.try &.as_s || ""
+    # Parse JSON body for content
+    params = CommentParams.from_json(env.request.body)
     
-    if content.empty?
+    if params.content.empty?
       env.response.status_code = 400
       next {
         "status"  => "error",
@@ -198,7 +189,7 @@ put "/api/comments/:id" do |env|
       }.to_json
     end
     
-    if content.size > 10000
+    if params.content.size > 10000
       env.response.status_code = 400
       next {
         "status"  => "error",
@@ -208,13 +199,19 @@ put "/api/comments/:id" do |env|
     
     POOL.exec(
       "UPDATE comments SET content = $1, updated_at = NOW() WHERE id = $2",
-      content, id
+      params.content, id
     )
     
     env.response.status_code = 200
     {
       "status"  => "success",
       "message" => "Comment updated successfully"
+    }.to_json
+  rescue JSON::SerializableError
+    env.response.status_code = 400
+    next {
+      "status"  => "error",
+      "message" => "Invalid JSON payload"
     }.to_json
   rescue e : Exception
     env.response.status_code = 500
