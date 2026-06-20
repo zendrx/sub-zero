@@ -112,8 +112,18 @@ module UserDB
       user["username"] = result.read(String)
       user["email"] = result.read(String)
       user["created_at"] = result.read(Time).to_s
-      user["last_login"] = result.read(Time?)?.try &.to_s || ""
-      user["is_admin"] = result.read(Bool?)?.try &.as(Bool) || false
+      last_login = result.read(Time?)
+      if last_login
+        user["last_login"] = last_login.to_s
+      else
+        user["last_login"] = ""
+      end
+      is_admin = result.read(Bool?)
+      if is_admin
+        user["is_admin"] = is_admin
+      else
+        user["is_admin"] = false
+      end
       user
     else
       nil
@@ -132,7 +142,12 @@ module UserDB
       user["email"] = result.read(String)
       user["password_hash"] = result.read(String)
       user["created_at"] = result.read(Time).to_s
-      user["is_admin"] = result.read(Bool?)?.try &.as(Bool) || false
+      is_admin = result.read(Bool?)
+      if is_admin
+        user["is_admin"] = is_admin
+      else
+        user["is_admin"] = false
+      end
       user
     else
       nil
@@ -151,7 +166,12 @@ module UserDB
       user["email"] = result.read(String)
       user["password_hash"] = result.read(String)
       user["created_at"] = result.read(Time).to_s
-      user["is_admin"] = result.read(Bool?)?.try &.as(Bool) || false
+      is_admin = result.read(Bool?)
+      if is_admin
+        user["is_admin"] = is_admin
+      else
+        user["is_admin"] = false
+      end
       user
     else
       nil
@@ -223,7 +243,12 @@ module PostDB
       post = Hash(String, JSON::Type).new
       post["id"] = result.read(Int64)
       post["title"] = result.read(String)
-      post["url"] = result.read(String?)?.try &.to_s || ""
+      url = result.read(String?)
+      if url
+        post["url"] = url
+      else
+        post["url"] = ""
+      end
       post["source"] = result.read(String)
       post["score"] = result.read(Int32)
       post["comment_count"] = result.read(Int32)
@@ -243,7 +268,12 @@ module PostDB
       post = Hash(String, JSON::Type).new
       post["id"] = result.read(Int64)
       post["title"] = result.read(String)
-      post["url"] = result.read(String?)?.try &.to_s || ""
+      url = result.read(String?)
+      if url
+        post["url"] = url
+      else
+        post["url"] = ""
+      end
       post["source"] = result.read(String)
       post["score"] = result.read(Int32)
       post["comment_count"] = result.read(Int32)
@@ -262,7 +292,12 @@ module PostDB
       post = Hash(String, JSON::Type).new
       post["id"] = result.read(Int64)
       post["title"] = result.read(String)
-      post["url"] = result.read(String?)?.try &.to_s || ""
+      url = result.read(String?)
+      if url
+        post["url"] = url
+      else
+        post["url"] = ""
+      end
       post["source"] = result.read(String)
       post["score"] = result.read(Int32)
       post["comment_count"] = result.read(Int32)
@@ -283,7 +318,12 @@ module PostDB
       post = Hash(String, JSON::Type).new
       post["id"] = result.read(Int64)
       post["title"] = result.read(String)
-      post["url"] = result.read(String?)?.try &.to_s || ""
+      url = result.read(String?)
+      if url
+        post["url"] = url
+      else
+        post["url"] = ""
+      end
       post["source"] = result.read(String)
       post["score"] = result.read(Int32)
       post["comment_count"] = result.read(Int32)
@@ -352,10 +392,20 @@ module CommentDB
     result.each do
       comment = Hash(String, JSON::Type).new
       comment["id"] = result.read(Int64)
-      comment["user_id"] = result.read(Int64?)? 0_i64
+      user_id = result.read(Int64?)
+      if user_id
+        comment["user_id"] = user_id
+      else
+        comment["user_id"] = 0_i64
+      end
       comment["content"] = result.read(String)
       comment["score"] = result.read(Int32)
-      comment["parent_id"] = result.read(Int64?)?.try &.as(Int64)
+      parent_id = result.read(Int64?)
+      if parent_id
+        comment["parent_id"] = parent_id
+      else
+        comment["parent_id"] = nil
+      end
       comment["created_at"] = result.read(Time).to_s
       rows << comment
     end
@@ -371,10 +421,20 @@ module CommentDB
       comment = Hash(String, JSON::Type).new
       comment["id"] = result.read(Int64)
       comment["post_id"] = result.read(Int64)
-      comment["user_id"] = result.read(Int64?)? 0_i64
+      user_id = result.read(Int64?)
+      if user_id
+        comment["user_id"] = user_id
+      else
+        comment["user_id"] = 0_i64
+      end
       comment["content"] = result.read(String)
       comment["score"] = result.read(Int32)
-      comment["parent_id"] = result.read(Int64?)?.try &.as(Int64)
+      parent_id = result.read(Int64?)
+      if parent_id
+        comment["parent_id"] = parent_id
+      else
+        comment["parent_id"] = nil
+      end
       comment["created_at"] = result.read(Time).to_s
       comment
     else
@@ -529,7 +589,12 @@ module SaveDB
       save = Hash(String, JSON::Type).new
       save["id"] = result.read(Int64)
       save["title"] = result.read(String)
-      save["url"] = result.read(String?)?.try &.to_s || ""
+      url = result.read(String?)
+      if url
+        save["url"] = url
+      else
+        save["url"] = ""
+      end
       save["source"] = result.read(String)
       save["score"] = result.read(Int32)
       save["comment_count"] = result.read(Int32)
