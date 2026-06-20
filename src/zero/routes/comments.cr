@@ -3,9 +3,10 @@
 require "json"
 require "kemal"
 
-# Helper to safely get a value from JSON params
+# Helper to safely get a JSON value
 def safe_json_value(value : JSON::Any?) : JSON::Any?
   return nil if value.nil?
+  
   # If it's an array, take the first element
   if value.is_a?(Array(JSON::Any))
     value.first?
@@ -27,12 +28,13 @@ post "/api/comments" do |env|
   end
   
   begin
+    # Get the JSON params hash
     json_params = env.params.json
     
-    # Extract values safely
-    post_id = safe_json_value(json_params["post_id"]?).try &.as_i64
-    content = safe_json_value(json_params["content"]?).try &.as_s || ""
-    parent_id = safe_json_value(json_params["parent_id"]?).try &.as_i64
+    # Extract values safely using as?(Type)
+    post_id = json_params["post_id"]?.try &.as_i64
+    content = json_params["content"]?.try &.as_s || ""
+    parent_id = json_params["parent_id"]?.try &.as_i64
     
     if post_id.nil?
       env.response.status_code = 400
@@ -58,7 +60,7 @@ post "/api/comments" do |env|
       }.to_json
     end
     
-    # Check if post exists
+    # Check if post exists using query (not exec)
     post_result = POOL.query("SELECT id FROM posts WHERE id = $1", post_id)
     if !post_result.move_next
       env.response.status_code = 404
@@ -115,7 +117,6 @@ get "/api/comments/:id" do |env|
     }.to_json
   end
   
-  # Get user info for this comment
   user_result = POOL.query(
     "SELECT username FROM users WHERE id = $1",
     comment["user_id"]
@@ -125,7 +126,6 @@ get "/api/comments/:id" do |env|
     username = user_result.read(String)
   end
   
-  # Check if user has voted on this comment
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
   user_vote = nil
   if valid && user_id
@@ -164,7 +164,6 @@ put "/api/comments/:id" do |env|
     }.to_json
   end
   
-  # Check if comment exists and belongs to user
   result = POOL.query(
     "SELECT user_id FROM comments WHERE id = $1",
     id
@@ -189,7 +188,7 @@ put "/api/comments/:id" do |env|
   end
   
   begin
-    content = safe_json_value(env.params.json["content"]?).try &.as_s || ""
+    content = env.params.json["content"]?.try &.as_s || ""
     
     if content.empty?
       env.response.status_code = 400
@@ -248,7 +247,6 @@ delete "/api/comments/:id" do |env|
     }.to_json
   end
   
-  # Check if comment exists and belongs to user
   result = POOL.query(
     "SELECT user_id, post_id FROM comments WHERE id = $1",
     id
@@ -275,7 +273,6 @@ delete "/api/comments/:id" do |env|
   
   POOL.exec("DELETE FROM comments WHERE id = $1", id)
   
-  # Update comment count on post
   if post_id
     PostDB.update_comment_count(post_id)
   end
@@ -309,7 +306,6 @@ post "/api/comments/:id/upvote" do |env|
     }.to_json
   end
   
-  # Check if comment exists
   result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
   if !result.move_next
     env.response.status_code = 404
@@ -358,7 +354,6 @@ post "/api/comments/:id/downvote" do |env|
     }.to_json
   end
   
-  # Check if comment exists
   result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
   if !result.move_next
     env.response.status_code = 404
