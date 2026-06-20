@@ -66,23 +66,25 @@ module DevToFetcher
       articles = [] of Hash(String, JSON::Any)
       
       data.as_a.each do |article|
-        # Extract article information
+        # Extract article information - use .try &.as_i for integers
         title = article["title"]?.to_s || "Untitled"
         url = article["url"]?.to_s || ""
         description = article["description"]?.to_s || ""
         cover_image = article["cover_image"]?.to_s || ""
         published_at = article["published_at"]?.to_s || ""
         tag_list = article["tag_list"]?.to_s || ""
-        positive_reactions_count = article["positive_reactions_count"]?.to_i || 0
-        comments_count = article["comments_count"]?.to_i || 0
-        external_id = article["id"]?.to_i64.to_s
-        reading_time_minutes = article["reading_time_minutes"]?.to_i || 0
+        positive_reactions_count = article["positive_reactions_count"]?.try &.as_i || 0
+        comments_count = article["comments_count"]?.try &.as_i || 0
+        external_id = article["id"]?.try &.as_i64.to_s
+        reading_time_minutes = article["reading_time_minutes"]?.try &.as_i || 0
+        
         user = article["user"]?
         user_name = user ? user["name"]?.to_s : ""
         user_username = user ? user["username"]?.to_s : ""
         user_profile_image = user ? user["profile_image"]?.to_s : ""
         user_github = user ? user["github_username"]?.to_s : ""
         user_twitter = user ? user["twitter_username"]?.to_s : ""
+        
         organisation = article["organization"]?
         org_name = organisation ? organisation["name"]?.to_s : ""
         
@@ -141,8 +143,8 @@ module DevToFetcher
           article["content"]?.to_s || "",
           article["source"]?.to_s || "devto",
           article["external_id"]?.to_s || "",
-          article["score"]?.to_i || 0,
-          article["comment_count"]?.to_i || 0,
+          article["score"]?.try &.as_i || 0,
+          article["comment_count"]?.try &.as_i || 0,
           false
         )
         saved_count += 1
@@ -321,9 +323,9 @@ module DevToFetcher
         article["url"] = JSON::Any.new(data["url"]?.to_s || "")
         article["content"] = JSON::Any.new(data["body_html"]?.to_s || data["description"]?.to_s || "")
         article["source"] = JSON::Any.new("devto")
-        article["external_id"] = JSON::Any.new(data["id"]?.to_i64.to_s)
-        article["score"] = JSON::Any.new(data["positive_reactions_count"]?.to_i || 0)
-        article["comment_count"] = JSON::Any.new(data["comments_count"]?.to_i || 0)
+        article["external_id"] = JSON::Any.new(data["id"]?.try &.as_i64.to_s)
+        article["score"] = JSON::Any.new(data["positive_reactions_count"]?.try &.as_i || 0)
+        article["comment_count"] = JSON::Any.new(data["comments_count"]?.try &.as_i || 0)
         article["is_user_post"] = JSON::Any.new(false)
         
         article
