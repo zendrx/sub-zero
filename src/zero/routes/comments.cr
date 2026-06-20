@@ -16,10 +16,30 @@ post "/api/comments" do |env|
   end
   
   begin
-    # Fix: Use as_i64 instead of to_i64, and handle the value properly
-    post_id = env.params.json["post_id"]?.try &.as_i64
-    content = env.params.json["content"]?.try &.as_s || ""
-    parent_id = env.params.json["parent_id"]?.try &.as_i64
+    # Get JSON params - handle properly
+    json_params = env.params.json
+    
+    # Get post_id - handle if it's a single value or array
+    post_id_value = json_params["post_id"]?
+    post_id = case post_id_value
+              when JSON::Any
+                post_id_value.as_i64
+              when Array(JSON::Any)
+                post_id_value.first?.try &.as_i64
+              else
+                nil
+              end
+    
+    content = json_params["content"]?.try &.as_s || ""
+    parent_id_value = json_params["parent_id"]?
+    parent_id = case parent_id_value
+                when JSON::Any
+                  parent_id_value.as_i64
+                when Array(JSON::Any)
+                  parent_id_value.first?.try &.as_i64
+                else
+                  nil
+                end
     
     if post_id.nil?
       env.response.status_code = 400
@@ -46,8 +66,8 @@ post "/api/comments" do |env|
     end
     
     # Check if post exists
-    post_result = POOL.exec("SELECT id FROM posts WHERE id = $1", post_id)
-    if post_result.rows.empty?
+    post_result = POOL.query("SELECT id FROM posts WHERE id = $1", post_id)
+    if !post_result.move_next
       env.response.status_code = 404
       next {
         "status"  => "error",
@@ -75,7 +95,7 @@ post "/api/comments" do |env|
     env.response.status_code = 500
     {
       "status"  => "error",
-      "message" => "Internal server error"
+      "message" => "Internal server error: #{e.message}"
     }.to_json
   end
 end
@@ -103,11 +123,14 @@ get "/api/comments/:id" do |env|
   end
   
   # Get user info for this comment
-  user_result = POOL.exec(
+  user_result = POOL.query(
     "SELECT username FROM users WHERE id = $1",
     comment["user_id"]
   )
-  username = user_result.rows.first? ? user_result.rows.first[0].to_s : "deleted"
+  username = "deleted"
+  if user_result.move_next
+    username = user_result.read(String)
+  end
   
   # Check if user has voted on this comment
   valid, user_id, _ = Auth.validate_session(env.request.headers, env.request.cookies)
@@ -149,13 +172,11 @@ put "/api/comments/:id" do |env|
   end
   
   # Check if comment exists and belongs to user
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT user_id FROM comments WHERE id = $1",
     id
   )
-  row = result.rows.first?
-  
-  if row.nil?
+  if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
@@ -163,7 +184,7 @@ put "/api/comments/:id" do |env|
     }.to_json
   end
   
-  comment_user_id = row[0]?.try &.to_i64
+  comment_user_id = result.read(Int64)
   
   is_admin = Auth.is_admin?(user_id)
   if comment_user_id != user_id && !is_admin
@@ -235,13 +256,11 @@ delete "/api/comments/:id" do |env|
   end
   
   # Check if comment exists and belongs to user
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT user_id, post_id FROM comments WHERE id = $1",
     id
   )
-  row = result.rows.first?
-  
-  if row.nil?
+  if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
@@ -249,8 +268,8 @@ delete "/api/comments/:id" do |env|
     }.to_json
   end
   
-  comment_user_id = row[0]?.try &.to_i64
-  post_id = row[1]?.try &.to_i64
+  comment_user_id = result.read(Int64)
+  post_id = result.read(Int64)
   
   is_admin = Auth.is_admin?(user_id)
   if comment_user_id != user_id && !is_admin
@@ -298,8 +317,8 @@ post "/api/comments/:id/upvote" do |env|
   end
   
   # Check if comment exists
-  result = POOL.exec("SELECT id FROM comments WHERE id = $1", id)
-  if result.rows.empty?
+  result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
+  if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
@@ -347,8 +366,8 @@ post "/api/comments/:id/downvote" do |env|
   end
   
   # Check if comment exists
-  result = POOL.exec("SELECT id FROM comments WHERE id = $1", id)
-  if result.rows.empty?
+  result = POOL.query("SELECT id FROM comments WHERE id = $1", id)
+  if !result.move_next
     env.response.status_code = 404
     next {
       "status"  => "error",
@@ -392,7 +411,7 @@ get "/api/comments/:id/replies" do |env|
     limit = 100
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT c.id, c.user_id, c.content, c.score, c.created_at,
             u.username
      FROM comments c
@@ -403,15 +422,26 @@ get "/api/comments/:id/replies" do |env|
     id, limit, offset
   )
   
-  replies = result.rows.map do |row|
-    {
-      "id"         => row[0].to_i64,
-      "user_id"    => row[1]?.try &.to_i64,
-      "content"    => row[2].to_s,
-      "score"      => row[3].to_i,
-      "created_at" => row[4].to_s,
-      "username"   => row[5]?.try &.to_s || "deleted"
-    }
+  replies = [] of Hash(String, JSON::Any)
+  result.each do
+    reply = Hash(String, JSON::Any).new
+    reply["id"] = JSON::Any.new(result.read(Int64))
+    user_id = result.read(Int64?)
+    if user_id
+      reply["user_id"] = JSON::Any.new(user_id)
+    else
+      reply["user_id"] = JSON::Any.new(0_i64)
+    end
+    reply["content"] = JSON::Any.new(result.read(String))
+    reply["score"] = JSON::Any.new(result.read(Int32))
+    reply["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    username = result.read(String?)
+    if username
+      reply["username"] = JSON::Any.new(username)
+    else
+      reply["username"] = JSON::Any.new("deleted")
+    end
+    replies << reply
   end
   
   env.response.status_code = 200
@@ -446,7 +476,7 @@ get "/api/comments/user/:user_id" do |env|
     limit = 100
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT c.id, c.post_id, c.content, c.score, c.created_at,
             p.title as post_title
      FROM comments c
@@ -457,15 +487,21 @@ get "/api/comments/user/:user_id" do |env|
     user_id, limit, offset
   )
   
-  comments = result.rows.map do |row|
-    {
-      "id"         => row[0].to_i64,
-      "post_id"    => row[1].to_i64,
-      "content"    => row[2].to_s,
-      "score"      => row[3].to_i,
-      "created_at" => row[4].to_s,
-      "post_title" => row[5]?.try &.to_s || "unknown"
-    }
+  comments = [] of Hash(String, JSON::Any)
+  result.each do
+    comment = Hash(String, JSON::Any).new
+    comment["id"] = JSON::Any.new(result.read(Int64))
+    comment["post_id"] = JSON::Any.new(result.read(Int64))
+    comment["content"] = JSON::Any.new(result.read(String))
+    comment["score"] = JSON::Any.new(result.read(Int32))
+    comment["created_at"] = JSON::Any.new(result.read(Time).to_s)
+    post_title = result.read(String?)
+    if post_title
+      comment["post_title"] = JSON::Any.new(post_title)
+    else
+      comment["post_title"] = JSON::Any.new("unknown")
+    end
+    comments << comment
   end
   
   env.response.status_code = 200
@@ -493,12 +529,12 @@ get "/api/posts/:id/comment-count" do |env|
     }.to_json
   end
   
-  result = POOL.exec(
+  result = POOL.query(
     "SELECT COUNT(*) FROM comments WHERE post_id = $1",
     id
   )
-  
-  count = result.rows.first?[0].to_i64
+  result.move_next
+  count = result.read(Int64)
   
   env.response.status_code = 200
   {
