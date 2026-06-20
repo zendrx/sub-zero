@@ -209,7 +209,7 @@ module Auth
       path: "/",
       http_only: true,
       secure: ENV["PRODUCTION"]? == "true",
-      samesite: "Lax"
+      samesite: HTTP::Cookie::SameSite::Lax
     )
   end
 
