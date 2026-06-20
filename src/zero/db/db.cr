@@ -101,28 +101,28 @@ module UserDB
     nil
   end
 
-  def self.find(id : Int64) : Hash(String, JSON::Type)?
+  def self.find(id : Int64) : Hash(String, JSON::Any)?
     result = POOL.query(
       "SELECT id, username, email, created_at, last_login, is_admin FROM users WHERE id = $1",
       id
     )
     if result.move_next
-      user = Hash(String, JSON::Type).new
-      user["id"] = result.read(Int64)
-      user["username"] = result.read(String)
-      user["email"] = result.read(String)
-      user["created_at"] = result.read(Time).to_s
+      user = Hash(String, JSON::Any).new
+      user["id"] = JSON::Any.new(result.read(Int64))
+      user["username"] = JSON::Any.new(result.read(String))
+      user["email"] = JSON::Any.new(result.read(String))
+      user["created_at"] = JSON::Any.new(result.read(Time).to_s)
       last_login = result.read(Time?)
       if last_login
-        user["last_login"] = last_login.to_s
+        user["last_login"] = JSON::Any.new(last_login.to_s)
       else
-        user["last_login"] = ""
+        user["last_login"] = JSON::Any.new("")
       end
       is_admin = result.read(Bool?)
       if is_admin
-        user["is_admin"] = is_admin
+        user["is_admin"] = JSON::Any.new(is_admin)
       else
-        user["is_admin"] = false
+        user["is_admin"] = JSON::Any.new(false)
       end
       user
     else
@@ -130,23 +130,23 @@ module UserDB
     end
   end
 
-  def self.find_by_username(username : String) : Hash(String, JSON::Type)?
+  def self.find_by_username(username : String) : Hash(String, JSON::Any)?
     result = POOL.query(
       "SELECT id, username, email, password_hash, created_at, is_admin FROM users WHERE username = $1",
       username
     )
     if result.move_next
-      user = Hash(String, JSON::Type).new
-      user["id"] = result.read(Int64)
-      user["username"] = result.read(String)
-      user["email"] = result.read(String)
-      user["password_hash"] = result.read(String)
-      user["created_at"] = result.read(Time).to_s
+      user = Hash(String, JSON::Any).new
+      user["id"] = JSON::Any.new(result.read(Int64))
+      user["username"] = JSON::Any.new(result.read(String))
+      user["email"] = JSON::Any.new(result.read(String))
+      user["password_hash"] = JSON::Any.new(result.read(String))
+      user["created_at"] = JSON::Any.new(result.read(Time).to_s)
       is_admin = result.read(Bool?)
       if is_admin
-        user["is_admin"] = is_admin
+        user["is_admin"] = JSON::Any.new(is_admin)
       else
-        user["is_admin"] = false
+        user["is_admin"] = JSON::Any.new(false)
       end
       user
     else
@@ -154,23 +154,23 @@ module UserDB
     end
   end
 
-  def self.find_by_email(email : String) : Hash(String, JSON::Type)?
+  def self.find_by_email(email : String) : Hash(String, JSON::Any)?
     result = POOL.query(
       "SELECT id, username, email, password_hash, created_at, is_admin FROM users WHERE email = $1",
       email
     )
     if result.move_next
-      user = Hash(String, JSON::Type).new
-      user["id"] = result.read(Int64)
-      user["username"] = result.read(String)
-      user["email"] = result.read(String)
-      user["password_hash"] = result.read(String)
-      user["created_at"] = result.read(Time).to_s
+      user = Hash(String, JSON::Any).new
+      user["id"] = JSON::Any.new(result.read(Int64))
+      user["username"] = JSON::Any.new(result.read(String))
+      user["email"] = JSON::Any.new(result.read(String))
+      user["password_hash"] = JSON::Any.new(result.read(String))
+      user["created_at"] = JSON::Any.new(result.read(Time).to_s)
       is_admin = result.read(Bool?)
       if is_admin
-        user["is_admin"] = is_admin
+        user["is_admin"] = JSON::Any.new(is_admin)
       else
-        user["is_admin"] = false
+        user["is_admin"] = JSON::Any.new(false)
       end
       user
     else
@@ -233,101 +233,101 @@ module PostDB
     nil
   end
 
-  def self.get_top(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Type))
+  def self.get_top(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT id, title, url, source, score, comment_count, created_at FROM posts ORDER BY score DESC LIMIT $1 OFFSET $2",
       limit, offset
     )
-    rows = [] of Hash(String, JSON::Type)
+    rows = [] of Hash(String, JSON::Any)
     result.each do
-      post = Hash(String, JSON::Type).new
-      post["id"] = result.read(Int64)
-      post["title"] = result.read(String)
+      post = Hash(String, JSON::Any).new
+      post["id"] = JSON::Any.new(result.read(Int64))
+      post["title"] = JSON::Any.new(result.read(String))
       url = result.read(String?)
       if url
-        post["url"] = url
+        post["url"] = JSON::Any.new(url)
       else
-        post["url"] = ""
+        post["url"] = JSON::Any.new("")
       end
-      post["source"] = result.read(String)
-      post["score"] = result.read(Int32)
-      post["comment_count"] = result.read(Int32)
-      post["created_at"] = result.read(Time).to_s
+      post["source"] = JSON::Any.new(result.read(String))
+      post["score"] = JSON::Any.new(result.read(Int32))
+      post["comment_count"] = JSON::Any.new(result.read(Int32))
+      post["created_at"] = JSON::Any.new(result.read(Time).to_s)
       rows << post
     end
     rows
   end
 
-  def self.get_latest(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Type))
+  def self.get_latest(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT id, title, url, source, score, comment_count, created_at FROM posts ORDER BY created_at DESC LIMIT $1 OFFSET $2",
       limit, offset
     )
-    rows = [] of Hash(String, JSON::Type)
+    rows = [] of Hash(String, JSON::Any)
     result.each do
-      post = Hash(String, JSON::Type).new
-      post["id"] = result.read(Int64)
-      post["title"] = result.read(String)
+      post = Hash(String, JSON::Any).new
+      post["id"] = JSON::Any.new(result.read(Int64))
+      post["title"] = JSON::Any.new(result.read(String))
       url = result.read(String?)
       if url
-        post["url"] = url
+        post["url"] = JSON::Any.new(url)
       else
-        post["url"] = ""
+        post["url"] = JSON::Any.new("")
       end
-      post["source"] = result.read(String)
-      post["score"] = result.read(Int32)
-      post["comment_count"] = result.read(Int32)
-      post["created_at"] = result.read(Time).to_s
+      post["source"] = JSON::Any.new(result.read(String))
+      post["score"] = JSON::Any.new(result.read(Int32))
+      post["comment_count"] = JSON::Any.new(result.read(Int32))
+      post["created_at"] = JSON::Any.new(result.read(Time).to_s)
       rows << post
     end
     rows
   end
 
-  def self.find(id : Int64) : Hash(String, JSON::Type)?
+  def self.find(id : Int64) : Hash(String, JSON::Any)?
     result = POOL.query(
       "SELECT id, title, url, source, score, comment_count, created_at FROM posts WHERE id = $1",
       id
     )
     if result.move_next
-      post = Hash(String, JSON::Type).new
-      post["id"] = result.read(Int64)
-      post["title"] = result.read(String)
+      post = Hash(String, JSON::Any).new
+      post["id"] = JSON::Any.new(result.read(Int64))
+      post["title"] = JSON::Any.new(result.read(String))
       url = result.read(String?)
       if url
-        post["url"] = url
+        post["url"] = JSON::Any.new(url)
       else
-        post["url"] = ""
+        post["url"] = JSON::Any.new("")
       end
-      post["source"] = result.read(String)
-      post["score"] = result.read(Int32)
-      post["comment_count"] = result.read(Int32)
-      post["created_at"] = result.read(Time).to_s
+      post["source"] = JSON::Any.new(result.read(String))
+      post["score"] = JSON::Any.new(result.read(Int32))
+      post["comment_count"] = JSON::Any.new(result.read(Int32))
+      post["created_at"] = JSON::Any.new(result.read(Time).to_s)
       post
     else
       nil
     end
   end
 
-  def self.search(query : String, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Type))
+  def self.search(query : String, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT id, title, url, source, score, comment_count, created_at FROM posts WHERE title ILIKE $1 ORDER BY score DESC LIMIT $2 OFFSET $3",
       "%#{query}%", limit, offset
     )
-    rows = [] of Hash(String, JSON::Type)
+    rows = [] of Hash(String, JSON::Any)
     result.each do
-      post = Hash(String, JSON::Type).new
-      post["id"] = result.read(Int64)
-      post["title"] = result.read(String)
+      post = Hash(String, JSON::Any).new
+      post["id"] = JSON::Any.new(result.read(Int64))
+      post["title"] = JSON::Any.new(result.read(String))
       url = result.read(String?)
       if url
-        post["url"] = url
+        post["url"] = JSON::Any.new(url)
       else
-        post["url"] = ""
+        post["url"] = JSON::Any.new("")
       end
-      post["source"] = result.read(String)
-      post["score"] = result.read(Int32)
-      post["comment_count"] = result.read(Int32)
-      post["created_at"] = result.read(Time).to_s
+      post["source"] = JSON::Any.new(result.read(String))
+      post["score"] = JSON::Any.new(result.read(Int32))
+      post["comment_count"] = JSON::Any.new(result.read(Int32))
+      post["created_at"] = JSON::Any.new(result.read(Time).to_s)
       rows << post
     end
     rows
@@ -383,59 +383,59 @@ module CommentDB
     nil
   end
 
-  def self.get_for_post(post_id : Int64, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Type))
+  def self.get_for_post(post_id : Int64, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT id, user_id, content, score, parent_id, created_at FROM comments WHERE post_id = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3",
       post_id, limit, offset
     )
-    rows = [] of Hash(String, JSON::Type)
+    rows = [] of Hash(String, JSON::Any)
     result.each do
-      comment = Hash(String, JSON::Type).new
-      comment["id"] = result.read(Int64)
+      comment = Hash(String, JSON::Any).new
+      comment["id"] = JSON::Any.new(result.read(Int64))
       user_id = result.read(Int64?)
       if user_id
-        comment["user_id"] = user_id
+        comment["user_id"] = JSON::Any.new(user_id)
       else
-        comment["user_id"] = 0_i64
+        comment["user_id"] = JSON::Any.new(0_i64)
       end
-      comment["content"] = result.read(String)
-      comment["score"] = result.read(Int32)
+      comment["content"] = JSON::Any.new(result.read(String))
+      comment["score"] = JSON::Any.new(result.read(Int32))
       parent_id = result.read(Int64?)
       if parent_id
-        comment["parent_id"] = parent_id
+        comment["parent_id"] = JSON::Any.new(parent_id)
       else
-        comment["parent_id"] = nil
+        comment["parent_id"] = JSON::Any.new(nil)
       end
-      comment["created_at"] = result.read(Time).to_s
+      comment["created_at"] = JSON::Any.new(result.read(Time).to_s)
       rows << comment
     end
     rows
   end
 
-  def self.find(id : Int64) : Hash(String, JSON::Type)?
+  def self.find(id : Int64) : Hash(String, JSON::Any)?
     result = POOL.query(
       "SELECT id, post_id, user_id, content, score, parent_id, created_at FROM comments WHERE id = $1",
       id
     )
     if result.move_next
-      comment = Hash(String, JSON::Type).new
-      comment["id"] = result.read(Int64)
-      comment["post_id"] = result.read(Int64)
+      comment = Hash(String, JSON::Any).new
+      comment["id"] = JSON::Any.new(result.read(Int64))
+      comment["post_id"] = JSON::Any.new(result.read(Int64))
       user_id = result.read(Int64?)
       if user_id
-        comment["user_id"] = user_id
+        comment["user_id"] = JSON::Any.new(user_id)
       else
-        comment["user_id"] = 0_i64
+        comment["user_id"] = JSON::Any.new(0_i64)
       end
-      comment["content"] = result.read(String)
-      comment["score"] = result.read(Int32)
+      comment["content"] = JSON::Any.new(result.read(String))
+      comment["score"] = JSON::Any.new(result.read(Int32))
       parent_id = result.read(Int64?)
       if parent_id
-        comment["parent_id"] = parent_id
+        comment["parent_id"] = JSON::Any.new(parent_id)
       else
-        comment["parent_id"] = nil
+        comment["parent_id"] = JSON::Any.new(nil)
       end
-      comment["created_at"] = result.read(Time).to_s
+      comment["created_at"] = JSON::Any.new(result.read(Time).to_s)
       comment
     else
       nil
@@ -577,29 +577,29 @@ module SaveDB
     result.read(Int64) > 0
   end
 
-  def self.get_user_saves(user_id : Int64, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Type))
+  def self.get_user_saves(user_id : Int64, limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
       "SELECT p.id, p.title, p.url, p.source, p.score, p.comment_count, p.created_at, s.created_at as saved_at
        FROM saved_posts s JOIN posts p ON s.post_id = p.id
        WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3",
       user_id, limit, offset
     )
-    rows = [] of Hash(String, JSON::Type)
+    rows = [] of Hash(String, JSON::Any)
     result.each do
-      save = Hash(String, JSON::Type).new
-      save["id"] = result.read(Int64)
-      save["title"] = result.read(String)
+      save = Hash(String, JSON::Any).new
+      save["id"] = JSON::Any.new(result.read(Int64))
+      save["title"] = JSON::Any.new(result.read(String))
       url = result.read(String?)
       if url
-        save["url"] = url
+        save["url"] = JSON::Any.new(url)
       else
-        save["url"] = ""
+        save["url"] = JSON::Any.new("")
       end
-      save["source"] = result.read(String)
-      save["score"] = result.read(Int32)
-      save["comment_count"] = result.read(Int32)
-      save["created_at"] = result.read(Time).to_s
-      save["saved_at"] = result.read(Time).to_s
+      save["source"] = JSON::Any.new(result.read(String))
+      save["score"] = JSON::Any.new(result.read(Int32))
+      save["comment_count"] = JSON::Any.new(result.read(Int32))
+      save["created_at"] = JSON::Any.new(result.read(Time).to_s)
+      save["saved_at"] = JSON::Any.new(result.read(Time).to_s)
       rows << save
     end
     rows
