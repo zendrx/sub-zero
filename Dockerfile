@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY shard.yml ./
 RUN shards install
+RUN shards update
 
 COPY . .
 
