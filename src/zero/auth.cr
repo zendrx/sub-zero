@@ -41,7 +41,7 @@ module Auth
       payload = decoded[0]
       
       # Check expiration
-      exp = payload["exp"]?.to_i64
+      exp = payload["exp"]?.as_i64
       if exp && exp < Time.utc.to_unix
         return nil
       end
@@ -56,7 +56,7 @@ module Auth
   def self.user_id_from_token(token : String) : Int64?
     payload = decode_token(token)
     if payload
-      payload["user_id"]?.to_i64
+      payload["user_id"]?.as_i64
     else
       nil
     end
@@ -157,7 +157,7 @@ module Auth
       return {false, nil, nil}
     end
     
-    user_id = payload["user_id"]?.to_i64
+    user_id = payload["user_id"]?.as_i64
     if !user_id
       return {false, nil, nil}
     end
