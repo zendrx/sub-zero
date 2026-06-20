@@ -17,7 +17,7 @@ module RecommendationEngine
 
   # Get feed based on type
   def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
-      limit : Int32 = 50, offset : Int32 = 0) : (Array(Hash(String, JSON::Any)) | Nil)
+                    limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     case feed_type
     when FeedType::Hot
       get_hot_feed(limit, offset)
@@ -27,27 +27,27 @@ module RecommendationEngine
       get_top_feed(limit, offset)
     when FeedType::Personalized
       if user_id
-        get_personalized_feed(user_id, limit, offset) || [] of Hash(String, JSON::Any)
+        get_personalized_feed(user_id, limit, offset)
       else
         get_hot_feed(limit, offset)
       end
     when FeedType::Trending
-      get_trending_feed(limit) || [] of Hash(String, JSON::Any)
+      get_trending_feed(limit)
     when FeedType::Discovery
       if user_id
-        get_discovery_feed(user_id, limit) || [] of Hash(String, JSON::Any)
+        get_discovery_feed(user_id, limit)
       else
         get_hot_feed(limit, offset)
       end
     when FeedType::Collaborative
       if user_id
-        get_collaborative_feed(user_id, limit) || [] of Hash(String, JSON::Any)
+        get_collaborative_feed(user_id, limit)
       else
         get_hot_feed(limit, offset)
       end
     when FeedType::Mixed
       if user_id
-        get_mixed_feed(user_id, limit) || [] of Hash(String, JSON::Any)
+        get_mixed_feed(user_id, limit)
       else
         get_hot_feed(limit, offset)
       end
@@ -228,26 +228,17 @@ module RecommendationEngine
 
   # Trending feed - posts with recent engagement spikes
   def self.get_trending_feed(limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    posts = AlgoDB.get_trending_posts(limit)
-    posts.map do |post|
-      post.merge({"feed_type" => JSON::Any.new("trending")})
-    end
+    AlgoDB.get_trending_posts(limit)
   end
 
   # Discovery feed - new sources the user hasn't explored
   def self.get_discovery_feed(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    posts = AlgoDB.get_discovery_posts(user_id, limit)
-    posts.map do |post|
-      post.merge({"feed_type" => JSON::Any.new("discovery")})
-    end
+    AlgoDB.get_discovery_posts(user_id, limit)
   end
 
   # Collaborative feed - what similar users like
   def self.get_collaborative_feed(user_id : Int64, limit : Int32 = 20) : Array(Hash(String, JSON::Any))
-    posts = AlgoDB.get_collaborative_recommendations(user_id, limit)
-    posts.map do |post|
-      post.merge({"feed_type" => JSON::Any.new("collaborative")})
-    end
+    AlgoDB.get_collaborative_recommendations(user_id, limit)
   end
 
   # Mixed feed - combines multiple feed types
