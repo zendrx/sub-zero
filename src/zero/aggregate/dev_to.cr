@@ -226,27 +226,28 @@ module DevToFetcher
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = 10) : Int32
     total_saved = 0
     
-    # Use fibers for concurrent fetching
-    channels = tags.map { Channel(Int32).new }
-    
-    tags.each_with_index do |tag, index|
-      spawn do
-        saved = fetch_articles_by_tag(tag, limit_per_tag)
-        channels[index].send(saved)
+    begin
+      # Use fibers for concurrent fetching
+      channels = tags.map { Channel(Int32).new }
+      
+      tags.each_with_index do |tag, index|
+        spawn do
+          saved = fetch_articles_by_tag(tag, limit_per_tag)
+          channels[index].send(saved)
+        end
       end
+      
+      # Collect results
+      tags.each_with_index do |tag, index|
+        saved = channels[index].receive
+        total_saved += saved
+        puts "Fetched #{saved} articles for tag ##{tag}"
+        sleep 1
+      end
+    rescue e : Exception
+      puts "Error fetching articles by tags: #{e.message}"
     end
     
-    # Collect results
-    tags.each_with_index do |tag, index|
-      saved = channels[index].receive
-      total_saved += saved
-      puts "Fetched #{saved} articles for tag ##{tag}"
-      sleep 1
-    end
-    
-    total_saved
-  rescue e : Exception
-    puts "Error fetching articles by tags: #{e.message}"
     total_saved
   end
   
