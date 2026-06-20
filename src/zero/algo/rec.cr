@@ -15,42 +15,43 @@ module RecommendationEngine
     Mixed
   end
 
-  # Get feed based on type
+  # Get feed based on type - explicit return for each branch
   def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
                     limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
-    case feed_type
-    when FeedType::Hot
-      get_hot_feed(limit, offset)
-    when FeedType::New
-      get_new_feed(limit, offset)
-    when FeedType::Top
-      get_top_feed(limit, offset)
-    when FeedType::Personalized
+    if feed_type == FeedType::Hot
+      return get_hot_feed(limit, offset)
+    elsif feed_type == FeedType::New
+      return get_new_feed(limit, offset)
+    elsif feed_type == FeedType::Top
+      return get_top_feed(limit, offset)
+    elsif feed_type == FeedType::Personalized
       if user_id
-        get_personalized_feed(user_id, limit, offset)
+        return get_personalized_feed(user_id, limit, offset)
       else
-        get_hot_feed(limit, offset)
+        return get_hot_feed(limit, offset)
       end
-    when FeedType::Trending
-      get_trending_feed(limit)
-    when FeedType::Discovery
+    elsif feed_type == FeedType::Trending
+      return get_trending_feed(limit)
+    elsif feed_type == FeedType::Discovery
       if user_id
-        get_discovery_feed(user_id, limit)
+        return get_discovery_feed(user_id, limit)
       else
-        get_hot_feed(limit, offset)
+        return get_hot_feed(limit, offset)
       end
-    when FeedType::Collaborative
+    elsif feed_type == FeedType::Collaborative
       if user_id
-        get_collaborative_feed(user_id, limit)
+        return get_collaborative_feed(user_id, limit)
       else
-        get_hot_feed(limit, offset)
+        return get_hot_feed(limit, offset)
       end
-    when FeedType::Mixed
+    elsif feed_type == FeedType::Mixed
       if user_id
-        get_mixed_feed(user_id, limit)
+        return get_mixed_feed(user_id, limit)
       else
-        get_hot_feed(limit, offset)
+        return get_hot_feed(limit, offset)
       end
+    else
+      return get_hot_feed(limit, offset)
     end
   end
 
