@@ -219,13 +219,13 @@
       <h1>Welcome back</h1>
       <p class="subtitle">Log in to your account to continue.</p>
 
-      <% if flash["error"] %>
-        <div class="alert alert-error"><%= flash["error"] %></div>
+      <% if flash(env)["error"] %>
+        <div class="alert alert-error"><%= flash(env)["error"] %></div>
       <% end %>
-      <% if flash["success"] %>
-        <div class="alert alert-success"><%= flash["success"] %></div>
+      <% if flash(env)["success"] %>
+        <div class="alert alert-success"><%= flash(env)["success"] %></div>
       <% end %>
-      <% if params["registered"]? %>
+      <% if env.params.query["registered"]? %>
         <div class="alert alert-success">Account created successfully! Please log in.</div>
       <% end %>
 
