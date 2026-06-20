@@ -209,7 +209,7 @@ module Auth
       path: "/",
       http_only: true,
       secure: ENV["PRODUCTION"]? == "true",
-      SameSite: "Lax"
+      samesite: "Lax"
     )
   end
 
