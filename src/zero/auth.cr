@@ -40,8 +40,8 @@ module Auth
       decoded = JWT.decode(token, JWT_SECRET, JWT::Algorithm::HS256)
       payload = decoded[0]
       
-      # Check expiration
-      exp = payload["exp"]?.as_i64
+      # Check expiration - handle nil safely with try
+      exp = payload["exp"]?.try &.as_i64
       if exp && exp < Time.utc.to_unix
         return nil
       end
@@ -56,7 +56,7 @@ module Auth
   def self.user_id_from_token(token : String) : Int64?
     payload = decode_token(token)
     if payload
-      payload["user_id"]?.as_i64
+      payload["user_id"]?.try &.as_i64
     else
       nil
     end
@@ -157,7 +157,7 @@ module Auth
       return {false, nil, nil}
     end
     
-    user_id = payload["user_id"]?.as_i64
+    user_id = payload["user_id"]?.try &.as_i64
     if !user_id
       return {false, nil, nil}
     end
@@ -209,7 +209,7 @@ module Auth
       path: "/",
       http_only: true,
       secure: ENV["PRODUCTION"]? == "true",
-      samesite: HTTP::Cookie::SameSite::Lax
+      same_site: HTTP::Cookie::SameSite::Lax
     )
   end
 
