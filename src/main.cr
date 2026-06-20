@@ -90,8 +90,8 @@ end
 def start_prune_scheduler
   spawn do
     loop do
-      # Wait 5 days before pruning
-      5.days.sleep
+      # Wait 5 days before pruning - use sleep with seconds
+      sleep 5.days.total_seconds
       puts "Running scheduled prune (every 5 days)..."
       pruned = PostDB.prune_old_posts(50000)
       puts "Pruned #{pruned} old external posts" if pruned > 0
