@@ -218,11 +218,11 @@
       <h1>Create your account</h1>
       <p class="subtitle">Join the community and start curating your feed.</p>
 
-      <% if flash(env)["error"] %>
-        <div class="alert alert-error"><%= flash(env)["error"] %></div>
+      <% if flash(env)["error"]? %>
+        <div class="alert alert-error"><%= flash(env)["error"]? %></div>
       <% end %>
-      <% if flash(env)["success"] %>
-        <div class="alert alert-success"><%= flash(env)["success"] %></div>
+      <% if flash(env)["success"]? %>
+        <div class="alert alert-success"><%= flash(env)["success"]? %></div>
       <% end %>
 
       <form action="/signup" method="POST" id="signupForm" x-data="signupForm()" @submit.prevent="submit">
