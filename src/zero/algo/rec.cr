@@ -2,19 +2,19 @@
 
 require "json"
 
-# Feed types enum
-enum FeedType
-  Hot
-  New
-  Top
-  Personalized
-  Trending
-  Discovery
-  Collaborative
-  Mixed
-end
-
 module RecommendationEngine
+  # Feed types enum
+  enum FeedType
+    Hot
+    New
+    Top
+    Personalized
+    Trending
+    Discovery
+    Collaborative
+    Mixed
+  end
+
   # Get feed based on type
   def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
                     limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
