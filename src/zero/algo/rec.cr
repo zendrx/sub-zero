@@ -17,7 +17,7 @@ module RecommendationEngine
 
   # Get feed based on type
   def self.get_feed(user_id : Int64? = nil, feed_type : FeedType = FeedType::Hot, 
-                    limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
+      limit : Int32 = 50, offset : Int32 = 0) : (Array(Hash(String, JSON::Any)) | Nil)
     case feed_type
     when FeedType::Hot
       get_hot_feed(limit, offset)
