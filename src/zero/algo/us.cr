@@ -14,7 +14,6 @@ module UserAlgorithms
     
     score = 0.0
     
-    # Handle nil values properly using `try` with `as_i64` and then `to_f`
     upvotes = stats["upvotes"]?.try &.as_i64
     if upvotes
       score += upvotes.to_f * upvote_weight
@@ -160,7 +159,8 @@ module UserAlgorithms
     remaining = limit - collab.size
     personal = [] of Hash(String, JSON::Any)
     if remaining > 0
-      personal = AlgoDB.get_personalized_feed(user_id, remaining, 0)
+      # Use RecommendationEngine instead of AlgoDB
+      personal = RecommendationEngine.get_personalized_feed(user_id, remaining, 0)
     end
     
     (collab + personal).map do |post|
