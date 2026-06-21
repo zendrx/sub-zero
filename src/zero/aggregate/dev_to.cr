@@ -192,15 +192,16 @@ module DevToFetcher
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = FETCH_LIMIT) : Int32
     total_saved = 0
 
-    tags.each do |tag|
-      saved = fetch_articles_by_tag(tag, limit_per_tag)
-      total_saved += saved
-      puts "Fetched #{saved} articles for tag ##{tag}"
+    begin
+      tags.each do |tag|
+        saved = fetch_articles_by_tag(tag, limit_per_tag)
+        total_saved += saved
+        puts "Fetched #{saved} articles for tag ##{tag}"
+      end
+    rescue e : Exception
+      puts "Error fetching articles by tags: #{e.message}"
     end
 
-    total_saved
-  rescue e : Exception
-    puts "Error fetching articles by tags: #{e.message}"
     total_saved
   end
 
