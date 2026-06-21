@@ -76,25 +76,25 @@ module DevToFetcher
       data = JSON.parse(body)
       articles = [] of Hash(String, JSON::Any)
 
-      puts "Dev.to response type: #{typeof(data)}"
+      array_data = data.as_a?
 
-      if data.is_a?(Array(JSON::Any))
-        puts "Dev.to has #{data.as_a.size} items in array"
+      if array_data
+        puts "Dev.to has #{array_data.size} items in array"
 
-        data.as_a.each_with_index do |article, index|
+        array_data.each_with_index do |article, index|
           begin
-            title = article["title"]?.to_s || "Untitled"
-            url = article["url"]?.to_s || ""
-            description = article["description"]?.to_s || ""
-            cover_image = article["cover_image"]?.to_s || ""
-            published_at = article["published_at"]?.to_s || ""
-            tag_list = article["tag_list"]?.to_s || ""
+            title = article["title"]?.try &.as_s || ""
+            url = article["url"]?.try &.as_s || ""
+            description = article["description"]?.try &.as_s || ""
+            cover_image = article["cover_image"]?.try &.as_s || ""
+            published_at = article["published_at"]?.try &.as_s || ""
+            tag_list = article["tag_list"]?.try &.as_s || ""
 
             positive_reactions_count = 0
-            if article["positive_reactions_count"]?
-              positive_reactions_count = article["positive_reactions_count"].as_i
-            elsif article["public_reactions_count"]?
-              positive_reactions_count = article["public_reactions_count"].as_i
+            if reactions = article["positive_reactions_count"]?
+              positive_reactions_count = reactions.as_i
+            elsif reactions = article["public_reactions_count"]?
+              positive_reactions_count = reactions.as_i
             end
 
             comments_count = article["comments_count"]?.try &.as_i || 0
@@ -102,14 +102,14 @@ module DevToFetcher
             reading_time_minutes = article["reading_time_minutes"]?.try &.as_i || 0
 
             user = article["user"]?
-            user_name = user ? user["name"]?.to_s : ""
-            user_username = user ? user["username"]?.to_s : ""
+            user_name = user ? user["name"]?.try &.as_s || "" : ""
+            user_username = user ? user["username"]?.try &.as_s || "" : ""
 
             organisation = article["organization"]?
-            org_name = organisation ? organisation["name"]?.to_s : ""
+            org_name = organisation ? organisation["name"]?.try &.as_s || "" : ""
 
             content = description
-            tags = tag_list.is_a?(Array) ? tag_list.as_a.join(", ") : tag_list.to_s
+            tags = tag_list.is_a?(Array) ? tag_list.as_a.join(", ") : tag_list
 
             article_data = Hash(String, JSON::Any).new
             article_data["title"] = JSON::Any.new(title)
@@ -117,7 +117,7 @@ module DevToFetcher
             article_data["content"] = JSON::Any.new(content)
             article_data["cover_image"] = JSON::Any.new(cover_image)
             article_data["source"] = JSON::Any.new("devto")
-            article_data["external_id"] = JSON::Any.new(external_id)
+            article_data["external_id"] = JSON::Any.new(external_id || "")
             article_data["score"] = JSON::Any.new(positive_reactions_count)
             article_data["comment_count"] = JSON::Any.new(comments_count)
             article_data["is_user_post"] = JSON::Any.new(false)
@@ -127,7 +127,6 @@ module DevToFetcher
             article_data["author_username"] = JSON::Any.new(user_username)
             article_data["reading_time"] = JSON::Any.new(reading_time_minutes)
             article_data["org_name"] = JSON::Any.new(org_name)
-            article_data["external_id_debug"] = JSON::Any.new(external_id || "MISSING")
 
             articles << article_data
 
