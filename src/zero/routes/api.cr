@@ -44,21 +44,7 @@ def rate_limit_key(env) : String
   ip
 end
 
-def check_rate_limit(env, key : String, max : Int32, window : Int32)
-  unless RateLimiter.allowed?(key, max, window)
-    remaining, reset_at = RateLimiter.status(key, max, window)
-    env.response.status_code = 429
-    env.response.headers["X-RateLimit-Limit"] = max.to_s
-    env.response.headers["X-RateLimit-Remaining"] = "0"
-    env.response.headers["X-RateLimit-Reset"] = reset_at.to_unix.to_s
-    env.response.headers["Retry-After"] = (reset_at - Time.utc).total_seconds.to_i.to_s
-    next {
-      "status" => "error",
-      "message" => "Rate limit exceeded. Try again later.",
-      "retry_after" => (reset_at - Time.utc).total_seconds.to_i,
-    }.to_json
-  end
-
+def apply_rate_limit_headers(env, key : String, max : Int32, window : Int32)
   remaining, reset_at = RateLimiter.status(key, max, window)
   env.response.headers["X-RateLimit-Limit"] = max.to_s
   env.response.headers["X-RateLimit-Remaining"] = remaining.to_s
@@ -71,55 +57,73 @@ end
 # ============================================================
 
 get "/api/db" do |env|
-  check_rate_limit(env, rate_limit_key(env), 10, 60)
+  key = rate_limit_key(env)
+  max = 10
+  window = 60
 
-  query = env.params.query["q"]?.try &.to_s || ""
-
-  if query.empty?
-    env.response.status_code = 400
-    next {
+  unless RateLimiter.allowed?(key, max, window)
+    remaining, reset_at = RateLimiter.status(key, max, window)
+    env.response.status_code = 429
+    env.response.headers["X-RateLimit-Limit"] = max.to_s
+    env.response.headers["X-RateLimit-Remaining"] = "0"
+    env.response.headers["X-RateLimit-Reset"] = reset_at.to_unix.to_s
+    env.response.headers["Retry-After"] = (reset_at - Time.utc).total_seconds.to_i.to_s
+    {
       "status" => "error",
-      "message" => "Query parameter 'q' is required",
+      "message" => "Rate limit exceeded. Try again later.",
+      "retry_after" => (reset_at - Time.utc).total_seconds.to_i,
     }.to_json
-  end
+  else
+    apply_rate_limit_headers(env, key, max, window)
 
-  # Only allow SELECT queries
-  stripped = query.strip.upcase
-  unless stripped.starts_with?("SELECT")
-    env.response.status_code = 403
-    next {
-      "status" => "error",
-      "message" => "Only SELECT queries are allowed",
-    }.to_json
-  end
+    query = env.params.query["q"]?.try &.to_s || ""
 
-  begin
-    result = POOL.query(query)
+    if query.empty?
+      env.response.status_code = 400
+      {
+        "status" => "error",
+        "message" => "Query parameter 'q' is required",
+      }.to_json
+    else
+      # Only allow SELECT queries
+      stripped = query.strip.upcase
+      unless stripped.starts_with?("SELECT")
+        env.response.status_code = 403
+        {
+          "status" => "error",
+          "message" => "Only SELECT queries are allowed",
+        }.to_json
+      else
+        begin
+          result = POOL.query(query)
 
-    columns = result.column_count > 0 ? (0...result.column_count).map { |i| result.column_name(i) } : [] of String
-    rows = [] of Array(JSON::Any)
+          columns = result.column_count > 0 ? (0...result.column_count).map { |i| result.column_name(i) } : [] of String
+          rows = [] of Array(JSON::Any)
 
-    result.each do
-      row = [] of JSON::Any
-      columns.each_with_index do |_, idx|
-        val = result.read(JSON::Any)
-        row << val
+          result.each do
+            row = [] of JSON::Any
+            columns.each_with_index do |_, idx|
+              val = result.read(JSON::Any)
+              row << val
+            end
+            rows << row
+          end
+
+          env.response.status_code = 200
+          {
+            "status" => "success",
+            "columns" => columns,
+            "rows" => rows,
+            "count" => rows.size,
+          }.to_json
+        rescue e : Exception
+          env.response.status_code = 400
+          {
+            "status" => "error",
+            "message" => "Query failed: #{e.message}",
+          }.to_json
+        end
       end
-      rows << row
     end
-
-    env.response.status_code = 200
-    {
-      "status" => "success",
-      "columns" => columns,
-      "rows" => rows,
-      "count" => rows.size,
-    }.to_json
-  rescue e : Exception
-    env.response.status_code = 400
-    {
-      "status" => "error",
-      "message" => "Query failed: #{e.message}",
-    }.to_json
   end
 end
