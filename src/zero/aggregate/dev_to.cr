@@ -76,7 +76,8 @@ module DevToFetcher
       data = JSON.parse(body)
       articles = [] of Hash(String, JSON::Any)
 
-      puts "Dev.to response type: #{data.class_name}"
+      # Use typeof or .class instead of .class_name
+      puts "Dev.to response type: #{typeof(data)}"
 
       if data.is_a?(Array(JSON::Any))
         puts "Dev.to has #{data.as_a.size} items in array"
@@ -132,7 +133,6 @@ module DevToFetcher
             articles << article_data
 
             if index < 3
-              # Fixed: use double quotes for strings
               puts "  Article #{index+1}: #{title[0..30]}... (ID: #{external_id || "NONE"})"
             end
           rescue e : Exception
@@ -140,7 +140,7 @@ module DevToFetcher
           end
         end
       else
-        puts "Response is not an array: #{data.class_name}"
+        puts "Response is not an array: #{typeof(data)}"
         puts "Response preview: #{body[0..200]}"
       end
 
