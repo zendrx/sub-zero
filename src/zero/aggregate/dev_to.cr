@@ -75,13 +75,11 @@ module DevToFetcher
         description = article["description"]?.try &.as_s || ""
         published_at = article["published_at"]?.try &.as_s || ""
 
-        # Generate unique external_id from URL
         external_id = url
         if external_id.empty?
           external_id = Digest::SHA256.hexdigest(title + published_at)
         end
 
-        # Build minimal article data
         article_data = Hash(String, JSON::Any).new
         article_data["title"] = JSON::Any.new(title)
         article_data["url"] = JSON::Any.new(url)
@@ -186,13 +184,15 @@ module DevToFetcher
 
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = DEFAULT_LIMIT) : Int32
     total_saved = 0
-    tags.each do |tag|
-      saved = fetch_articles_by_tag(tag, limit_per_tag)
-      total_saved += saved
+    begin
+      tags.each do |tag|
+        saved = fetch_articles_by_tag(tag, limit_per_tag)
+        total_saved += saved
+        puts "Fetched #{saved} articles for tag #{tag}"
+      end
+    rescue e : Exception
+      puts "Error fetching articles by tags: #{e.message}"
     end
-    total_saved
-  rescue e : Exception
-    puts "Error fetching articles by tags: #{e.message}"
     total_saved
   end
 
