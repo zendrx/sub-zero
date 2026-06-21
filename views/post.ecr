@@ -83,7 +83,6 @@
       font-size: 20px;
       cursor: pointer;
       padding: 2px 8px;
-      transition: color 0.2s;
       line-height: 1;
     }
     .vote-btn:hover { color: #0366d6; }
@@ -99,9 +98,8 @@
       font-size: 24px;
       font-weight: 600;
       margin-bottom: 8px;
+      color: #24292e;
     }
-    .post-title a { color: #24292e; }
-    .post-title a:hover { text-decoration: underline; }
     .post-content {
       font-size: 16px;
       color: #24292e;
@@ -145,6 +143,11 @@
     .post-source.hackernews { background: #f6f6ef; color: #ff6600; }
     .post-source.devto { background: #f0f0f0; color: #0a0a0a; }
     .post-source.user { background: #e6f9ed; color: #28a745; }
+    .external-link {
+      font-size: 13px;
+      color: #959da5;
+    }
+    .external-link:hover { color: #0366d6; }
     .save-btn {
       background: none;
       border: 1px solid #e1e4e8;
@@ -153,7 +156,6 @@
       font-size: 12px;
       color: #586069;
       cursor: pointer;
-      transition: all 0.2s;
     }
     .save-btn:hover { background: #f1f8ff; border-color: #0366d6; }
 
@@ -179,12 +181,10 @@
       font-family: inherit;
       resize: vertical;
       min-height: 80px;
-      transition: border-color 0.2s;
     }
     .comment-form textarea:focus {
       outline: none;
       border-color: #0366d6;
-      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
     }
     .comment-form .btn-submit {
       margin-top: 8px;
@@ -196,7 +196,6 @@
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: background 0.2s;
     }
     .comment-form .btn-submit:hover { background: #0255b3; }
     .comment-form .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -244,23 +243,6 @@
       color: #586069;
     }
 
-    .alert {
-      padding: 12px 16px;
-      border-radius: 6px;
-      margin-bottom: 12px;
-      font-size: 14px;
-    }
-    .alert-error {
-      background: #ffeef0;
-      border: 1px solid #f97583;
-      color: #d73a49;
-    }
-    .alert-success {
-      background: #e6ffed;
-      border: 1px solid #85e89d;
-      color: #28a745;
-    }
-
     .back-link {
       display: inline-block;
       margin-top: 12px;
@@ -277,7 +259,6 @@
       border-top: 1px solid #e1e4e8;
       margin-top: auto;
     }
-    .footer p { margin: 4px 0; }
 
     @media (max-width: 600px) {
       .post-card { padding: 16px; }
@@ -310,10 +291,8 @@
   </header>
 
   <main class="container" x-data="postPage()" x-init="loadPost()">
-    <!-- Loading -->
     <div x-show="loading" style="text-align:center;padding:40px 0;color:#586069;">Loading post...</div>
 
-    <!-- Post -->
     <div x-show="!loading && post" class="post-card">
       <div class="post-header">
         <div class="post-votes">
@@ -322,14 +301,13 @@
           <button class="vote-btn downvote" :class="{ active: post.user_vote === -1 }" @click="vote(-1)">▼</button>
         </div>
         <div class="post-body">
-          <h1 class="post-title">
-            <a :href="post.url || '#'" target="_blank" x-text="post.title"></a>
-          </h1>
+          <h1 class="post-title" x-text="post.title"></h1>
           <div class="post-content" x-html="post.content || ''"></div>
           <div class="post-meta">
             <span class="post-source" :class="post.source" x-text="post.source"></span>
             <span x-text="timeAgo(post.created_at)"></span>
             <span x-text="post.comment_count + ' comments'"></span>
+            <a :href="post.url" target="_blank" class="external-link" x-show="post.url" x-text="'(' + hostname(post.url) + ')'"></a>
             <% if logged_in?(env) %>
               <button class="save-btn" @click="savePost" x-text="post.saved ? 'Unsave' : 'Save'"></button>
             <% end %>
@@ -339,17 +317,14 @@
       <a href="/" class="back-link">← Back to feed</a>
     </div>
 
-    <!-- Not found -->
     <div x-show="!loading && !post" class="post-card" style="text-align:center;padding:40px 0;">
       <p style="color:#586069;">Post not found.</p>
       <a href="/" class="back-link">← Back to feed</a>
     </div>
 
-    <!-- Comments -->
     <div class="comments-section" x-show="!loading && post">
       <h2 x-text="post.comment_count + ' comments'"></h2>
 
-      <!-- Comment form -->
       <% if logged_in?(env) %>
         <div class="comment-form">
           <textarea x-model="newComment" placeholder="Write a comment..." rows="3"></textarea>
@@ -364,7 +339,6 @@
         </p>
       <% end %>
 
-      <!-- Comments list -->
       <div x-show="comments.length === 0" class="empty-state">No comments yet. Be the first!</div>
 
       <template x-for="comment in comments" :key="comment.id">
@@ -380,13 +354,11 @@
             <button class="vote-btn downvote" :class="{ active: comment.user_vote === -1 }" @click="voteComment(comment.id, -1)">▼</button>
             <button class="reply-btn" @click="showReply(comment.id)">Reply</button>
           </div>
-          <!-- Reply form -->
           <div x-show="replyTo === comment.id" style="margin-top:8px;">
             <textarea x-model="replyContent" placeholder="Write a reply..." rows="2" style="width:100%;padding:8px 10px;border:1px solid #e1e4e8;border-radius:6px;font-size:14px;font-family:inherit;"></textarea>
             <button class="btn-submit" style="padding:4px 16px;font-size:13px;margin-top:4px;" @click="submitReply(comment.id)" :disabled="replyLoading || !replyContent.trim()">Post Reply</button>
             <button style="background:none;border:none;color:#586069;font-size:13px;cursor:pointer;margin-left:8px;" @click="replyTo = null">Cancel</button>
           </div>
-          <!-- Replies -->
           <div class="replies" x-show="comment.replies && comment.replies.length > 0">
             <template x-for="reply in comment.replies" :key="reply.id">
               <div class="comment" style="padding:8px 0;">
@@ -437,9 +409,7 @@
             .then(data => {
               if (data.status === 'success') {
                 this.post = data.post;
-                this.comments = data.comments || [];
-                // Add replies structure
-                this.comments = this.buildCommentTree(this.comments);
+                this.comments = this.buildCommentTree(data.comments || []);
               } else {
                 this.post = null;
               }
@@ -477,8 +447,12 @@
           return days + 'd ago';
         },
 
+        hostname(url) {
+          try { return new URL(url).hostname; } catch { return url; }
+        },
+
         vote(direction) {
-          if (!this.currentUser) { alert('Please login to vote'); return; }
+          if (!this.currentUser) { window.location.href = '/login'; return; }
           const endpoint = direction === 1 ? `/api/posts/${postId}/upvote` : `/api/posts/${postId}/downvote`;
           fetch(endpoint, { method: 'POST' })
             .then(res => res.json())
@@ -487,9 +461,7 @@
                 this.post.user_vote = 0;
                 this.post.score -= direction;
               } else {
-                if (this.post.user_vote) {
-                  this.post.score -= this.post.user_vote;
-                }
+                if (this.post.user_vote) this.post.score -= this.post.user_vote;
                 this.post.user_vote = direction;
                 this.post.score += direction;
               }
@@ -497,12 +469,11 @@
         },
 
         voteComment(commentId, direction) {
-          if (!this.currentUser) { alert('Please login to vote'); return; }
+          if (!this.currentUser) { window.location.href = '/login'; return; }
           const endpoint = direction === 1 ? `/api/comments/${commentId}/upvote` : `/api/comments/${commentId}/downvote`;
           fetch(endpoint, { method: 'POST' })
             .then(res => res.json())
             .then(() => {
-              // Update comment score in tree
               const update = (items) => {
                 for (let c of items) {
                   if (c.id === commentId) {
@@ -525,7 +496,7 @@
         },
 
         savePost() {
-          if (!this.currentUser) { alert('Please login to save'); return; }
+          if (!this.currentUser) { window.location.href = '/login'; return; }
           const method = this.post.saved ? 'DELETE' : 'POST';
           fetch(`/api/posts/${postId}/save`, { method })
             .then(res => res.json())
@@ -533,17 +504,14 @@
         },
 
         submitComment() {
-          if (!this.currentUser) { alert('Please login to comment'); return; }
+          if (!this.currentUser) { window.location.href = '/login'; return; }
           if (!this.newComment.trim()) return;
 
           this.commentLoading = true;
           fetch('/api/comments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              post_id: parseInt(postId),
-              content: this.newComment.trim()
-            })
+            body: JSON.stringify({ post_id: postId, content: this.newComment.trim() })
           })
           .then(res => res.json())
           .then(data => {
@@ -551,14 +519,9 @@
             if (data.status === 'success') {
               this.newComment = '';
               this.loadPost();
-            } else {
-              alert(data.message || 'Failed to post comment');
             }
           })
-          .catch(() => {
-            this.commentLoading = false;
-            alert('Something went wrong');
-          });
+          .catch(() => { this.commentLoading = false; });
         },
 
         showReply(commentId) {
@@ -567,18 +530,14 @@
         },
 
         submitReply(commentId) {
-          if (!this.currentUser) { alert('Please login to reply'); return; }
+          if (!this.currentUser) { window.location.href = '/login'; return; }
           if (!this.replyContent.trim()) return;
 
           this.replyLoading = true;
           fetch('/api/comments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              post_id: parseInt(postId),
-              content: this.replyContent.trim(),
-              parent_id: commentId
-            })
+            body: JSON.stringify({ post_id: postId, content: this.replyContent.trim(), parent_id: commentId })
           })
           .then(res => res.json())
           .then(data => {
@@ -587,14 +546,9 @@
               this.replyTo = null;
               this.replyContent = '';
               this.loadPost();
-            } else {
-              alert(data.message || 'Failed to post reply');
             }
           })
-          .catch(() => {
-            this.replyLoading = false;
-            alert('Something went wrong');
-          });
+          .catch(() => { this.replyLoading = false; });
         }
       };
     }
