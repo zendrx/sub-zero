@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sub Zero - Content Aggregator</title>
   <style>
-    /* Reset and Base */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -18,7 +17,6 @@
     a:hover { text-decoration: underline; }
     .container { max-width: 800px; margin: 0 auto; padding: 0 16px; }
 
-    /* Header - Clean like HN/Dev.to */
     .header {
       background: #fff;
       border-bottom: 1px solid #e1e4e8;
@@ -58,16 +56,8 @@
       font-weight: 500;
     }
     .btn-primary:hover { background: #0255b3; text-decoration: none; }
-    .btn-outline {
-      border: 1px solid #e1e4e8;
-      padding: 5px 13px;
-      border-radius: 6px;
-      color: #586069 !important;
-    }
-    .btn-outline:hover { background: #f6f8fa; text-decoration: none; }
     .mobile-toggle { display: none; background: none; border: none; font-size: 24px; cursor: pointer; }
 
-    /* Feed Selector - Tabs like Dev.to */
     .feed-selector {
       display: flex;
       gap: 4px;
@@ -75,9 +65,6 @@
       border-bottom: 1px solid #e1e4e8;
       margin-bottom: 16px;
       flex-wrap: wrap;
-      background: #fff;
-      border-radius: 8px;
-      padding: 8px;
     }
     .feed-btn {
       background: none;
@@ -95,54 +82,14 @@
       color: #fff;
     }
 
-    /* Hero Section */
-    .hero {
-      text-align: center;
-      padding: 40px 20px 30px;
-      background: #fff;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      border: 1px solid #e1e4e8;
-    }
-    .hero h1 {
-      font-size: 28px;
-      font-weight: 700;
-      color: #24292e;
-    }
-    .hero p {
-      color: #586069;
-      font-size: 16px;
-      margin-top: 8px;
-    }
-    .hero .cta-buttons {
-      margin-top: 16px;
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .hero .btn-large {
-      padding: 10px 24px;
-      font-size: 16px;
-      border-radius: 6px;
-      display: inline-block;
-    }
-    .hero .btn-large.primary { background: #0366d6; color: #fff; }
-    .hero .btn-large.primary:hover { background: #0255b3; text-decoration: none; }
-    .hero .btn-large.outline { border: 1px solid #e1e4e8; color: #24292e; }
-    .hero .btn-large.outline:hover { background: #f6f8fa; text-decoration: none; }
-
-    /* Posts - Clean like HN/Reddit */
     .post {
       display: flex;
       gap: 12px;
-      padding: 12px 0;
+      padding: 12px 16px;
       border-bottom: 1px solid #e1e4e8;
       background: #fff;
-      padding: 12px 16px;
       border-radius: 6px;
       margin-bottom: 8px;
-      transition: background 0.2s;
     }
     .post:hover { background: #f6f8fa; }
     .post-votes {
@@ -159,7 +106,6 @@
       font-size: 16px;
       cursor: pointer;
       padding: 2px 8px;
-      transition: color 0.2s;
       line-height: 1;
     }
     .vote-btn:hover { color: #0366d6; }
@@ -177,7 +123,6 @@
       margin-bottom: 4px;
     }
     .post-title a { color: #24292e; }
-    .post-title a:visited { color: #6a737d; }
     .post-title a:hover { text-decoration: underline; }
     .post-meta {
       font-size: 12px;
@@ -208,18 +153,20 @@
       font-size: 11px;
       color: #586069;
       cursor: pointer;
-      transition: all 0.2s;
     }
     .save-btn:hover { background: #f1f8ff; border-color: #0366d6; }
+    .external-link {
+      font-size: 11px;
+      color: #959da5;
+    }
+    .external-link:hover { color: #0366d6; }
 
-    /* Loading & Empty */
     .loading, .empty-state {
       text-align: center;
       padding: 40px 0;
       color: #586069;
     }
 
-    /* Footer */
     .footer {
       text-align: center;
       padding: 24px 0;
@@ -228,18 +175,14 @@
       border-top: 1px solid #e1e4e8;
       margin-top: 24px;
     }
-    .footer p { margin: 4px 0; }
 
-    /* Responsive */
     @media (max-width: 600px) {
       .nav { display: none; }
       .mobile-toggle { display: block; }
       .nav.open { display: flex; flex-direction: column; width: 100%; padding: 12px 0; }
       .post { flex-wrap: wrap; }
       .post-votes { flex-direction: row; width: 100%; justify-content: flex-start; gap: 4px; }
-      .feed-selector { gap: 4px; }
       .feed-btn { font-size: 12px; padding: 4px 12px; }
-      .hero h1 { font-size: 22px; }
     }
   </style>
 </head>
@@ -268,20 +211,6 @@
   </header>
 
   <main class="container">
-    <!-- Hero Section -->
-    <section class="hero">
-      <h1>❄️ Sub Zero</h1>
-      <p>Curated content from Reddit, Hacker News & Dev.to — all in one place.</p>
-      <div class="cta-buttons">
-        <% if logged_in?(env) %>
-          <a href="/settings" class="btn-large primary">Your Feed</a>
-        <% else %>
-          <a href="/signup" class="btn-large primary">Get Started</a>
-          <a href="/login" class="btn-large outline">Log In</a>
-        <% end %>
-      </div>
-    </section>
-
     <div class="feed-selector" id="feedSelector">
       <button class="feed-btn active" data-feed="mixed">Mixed</button>
       <button class="feed-btn" data-feed="hot">Hot</button>
@@ -332,6 +261,7 @@
       const isSaved = post.saved ? 'Saved' : 'Save';
       const upvoteActive = post.user_vote === 1 ? 'active' : '';
       const downvoteActive = post.user_vote === -1 ? 'active' : '';
+      const externalUrl = post.url && post.url !== '' ? post.url : null;
 
       return `
         <article class="post" data-id="${post.id}">
@@ -342,7 +272,8 @@
           </div>
           <div class="post-content">
             <h2 class="post-title">
-              <a href="${post.url || '#'}" target="_blank">${post.title}</a>
+              <a href="/post/${post.id}">${post.title}</a>
+              ${externalUrl ? `<a href="${externalUrl}" target="_blank" class="external-link">(${new URL(externalUrl).hostname})</a>` : ''}
             </h2>
             <div class="post-meta">
               <span class="post-source ${sourceClass}">${sourceClass}</span>
@@ -369,7 +300,7 @@
 
     function vote(postId, direction) {
       if (!currentUser) {
-        alert('Please login to vote');
+        window.location.href = '/login';
         return;
       }
       const endpoint = direction === 1 ? `/api/posts/${postId}/upvote` : `/api/posts/${postId}/downvote`;
@@ -379,7 +310,7 @@
 
     function savePost(postId) {
       if (!currentUser) {
-        alert('Please login to save posts');
+        window.location.href = '/login';
         return;
       }
       fetch(`/api/posts/${postId}/save`, { method: 'POST' })
