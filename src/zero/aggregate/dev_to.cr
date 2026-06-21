@@ -1,4 +1,5 @@
 # dev_to.cr - Dev.to content fetcher for Crystal Aggregator
+# Final debug version with comprehensive nil handling.
 
 require "http/client"
 require "json"
@@ -26,95 +27,133 @@ module DevToFetcher
     end
 
     url = query.empty? ? "#{BASE_URL}/articles" : "#{BASE_URL}/articles?#{query.join("&")}"
-    puts "Dev.to URL: #{url}"
+    puts "[Dev.to] Fetching: #{url}"
 
     headers = HTTP::Headers{
       "User-Agent" => "CrystalAggregator/1.0",
       "Accept"     => "application/json"
     }
 
-    if api_key = ENV["DEV_TO"]?
+    api_key = ENV["DEV_TO"]?
+    if api_key
       headers["api-key"] = api_key
+      puts "[Dev.to] Using API key (length: #{api_key.size})"
+    else
+      puts "[Dev.to] WARNING: DEV_TO env var not set."
     end
 
     response = HTTP::Client.get(url, headers: headers)
+    puts "[Dev.to] Response status: #{response.status_code}"
 
     case response.status_code
     when 200
       parse_articles_response(response.body)
+    when 401
+      puts "[Dev.to] ERROR: 401 Unauthorized – invalid API key."
+      [] of Hash(String, JSON::Any)
+    when 403
+      puts "[Dev.to] ERROR: 403 Forbidden – API key may be invalid or expired."
+      [] of Hash(String, JSON::Any)
     when 429
-      puts "Rate limited by Dev.to, waiting 30 seconds..."
+      puts "[Dev.to] Rate limited (429). Waiting 30 seconds..."
       sleep 30
       response = HTTP::Client.get(url, headers: headers)
       if response.status_code == 200
         parse_articles_response(response.body)
       else
-        puts "Failed to fetch articles after retry: #{response.status_code}"
+        puts "[Dev.to] Retry failed with status #{response.status_code}."
         [] of Hash(String, JSON::Any)
       end
     else
-      puts "Failed to fetch articles: #{response.status_code}"
+      puts "[Dev.to] Unexpected status: #{response.status_code}"
+      puts "[Dev.to] Response preview: #{response.body[0..200]}" if response.body
       [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
-    puts "Error fetching articles: #{e.message}"
+    puts "[Dev.to] EXCEPTION in fetch_articles: #{e.message}"
     [] of Hash(String, JSON::Any)
   end
 
   def self.parse_articles_response(body : String) : Array(Hash(String, JSON::Any))
+    articles = [] of Hash(String, JSON::Any)
     begin
       data = JSON.parse(body)
-      articles = [] of Hash(String, JSON::Any)
-
       array_data = data.as_a?
-      return articles unless array_data
-
-      array_data.each do |article|
-        title = article["title"]?.try &.as_s || "Untitled"
-        url = article["url"]?.try &.as_s || ""
-        description = article["description"]?.try &.as_s || ""
-        published_at = article["published_at"]?.try &.as_s || ""
-
-        external_id = url
-        if external_id.empty?
-          external_id = Digest::SHA256.hexdigest(title + published_at)
-        end
-
-        article_data = Hash(String, JSON::Any).new
-        article_data["title"] = JSON::Any.new(title)
-        article_data["url"] = JSON::Any.new(url)
-        article_data["content"] = JSON::Any.new(description)
-        article_data["published_at"] = JSON::Any.new(published_at)
-        article_data["external_id"] = JSON::Any.new(external_id)
-        article_data["source"] = JSON::Any.new("devto")
-        article_data["score"] = JSON::Any.new(0)
-        article_data["comment_count"] = JSON::Any.new(0)
-        article_data["is_user_post"] = JSON::Any.new(false)
-
-        articles << article_data
+      unless array_data
+        puts "[Dev.to] Response is not an array. Type: #{typeof(data)}"
+        puts "[Dev.to] Preview: #{body[0..200]}"
+        return articles
       end
 
-      articles
+      puts "[Dev.to] Parsing #{array_data.size} articles..."
+
+      array_data.each_with_index do |article, idx|
+        begin
+          # Safely extract values with nil checks
+          title = article["title"]?.try &.as_s || ""
+          url = article["url"]?.try &.as_s || ""
+          description = article["description"]?.try &.as_s || ""
+          published_at = article["published_at"]?.try &.as_s || ""
+
+          if title.empty? || url.empty?
+            puts "[Dev.to] Article #{idx} skipped: missing title or URL."
+            next
+          end
+
+          # Generate unique external_id from URL, fallback to hash
+          external_id = url
+          if external_id.empty?
+            external_id = Digest::SHA256.hexdigest(title + published_at)
+          end
+
+          # Build minimal article data
+          article_data = Hash(String, JSON::Any).new
+          article_data["title"] = JSON::Any.new(title)
+          article_data["url"] = JSON::Any.new(url)
+          article_data["content"] = JSON::Any.new(description)
+          article_data["published_at"] = JSON::Any.new(published_at)
+          article_data["external_id"] = JSON::Any.new(external_id)
+          article_data["source"] = JSON::Any.new("devto")
+          article_data["score"] = JSON::Any.new(0)
+          article_data["comment_count"] = JSON::Any.new(0)
+          article_data["is_user_post"] = JSON::Any.new(false)
+
+          articles << article_data
+          if idx < 3
+            puts "[Dev.to]   #{idx+1}. #{title[0..40]}... (id: #{external_id[0..12]})"
+          end
+        rescue e : Exception
+          puts "[Dev.to] Error parsing article #{idx}: #{e.message}"
+        end
+      end
+
+      puts "[Dev.to] Parsed #{articles.size} valid articles."
     rescue e : Exception
-      puts "Error parsing Dev.to response: #{e.message}"
-      [] of Hash(String, JSON::Any)
+      puts "[Dev.to] FATAL parse error: #{e.message}"
+      puts "[Dev.to] Body preview: #{body[0..500]}"
     end
+    articles
   end
 
   def self.save_articles_to_db(articles : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
     return 0 if articles.empty?
 
-    articles.each do |article|
+    puts "[Dev.to] Saving #{articles.size} articles..."
+    articles.each_with_index do |article, idx|
       external_id = article["external_id"]?.to_s
-      next if external_id.empty?
+      if external_id.empty?
+        puts "[Dev.to] Article #{idx} missing external_id, skipping."
+        next
+      end
 
+      # Check existence
       result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'devto'",
         external_id
       )
-
       if result.move_next
+        puts "[Dev.to] Article #{external_id} already exists, skipping."
         next
       end
 
@@ -122,7 +161,6 @@ module DevToFetcher
         title = article["title"]?.to_s || "Untitled"
         url = article["url"]?.to_s || ""
         content = article["content"]?.to_s || ""
-        source = "devto"
 
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) 
@@ -130,75 +168,71 @@ module DevToFetcher
           title,
           url,
           content,
-          source,
+          "devto",
           external_id,
           0,
           0,
           false
         )
         saved_count += 1
+        if saved_count <= 3
+          puts "[Dev.to]   Saved: #{title[0..40]}..."
+        end
       rescue e : PG::Error
-        puts "Database error for article #{external_id}: #{e.message}"
+        puts "[Dev.to] DB error for #{external_id}: #{e.message}"
       end
     end
 
-    puts "Saved #{saved_count} new Dev.to articles"
+    puts "[Dev.to] Successfully saved #{saved_count} new articles."
     saved_count
+  rescue e : Exception
+    puts "[Dev.to] save_articles_to_db error: #{e.message}"
+    0
   end
 
+  # High-level fetch methods
   def self.fetch_latest_articles(limit : Int32 = DEFAULT_LIMIT) : Int32
-    puts "Fetching latest articles from Dev.to..."
-    params = {
-      "per_page" => limit,
-      "state"    => "fresh"
-    }
+    puts "[Dev.to] Fetching latest (limit #{limit})..."
+    params = { "per_page" => limit, "state" => "fresh" }
     articles = fetch_articles(params)
     save_articles_to_db(articles)
   end
 
   def self.fetch_top_articles(limit : Int32 = DEFAULT_LIMIT, time_range : String = "week") : Int32
-    puts "Fetching top articles from Dev.to for #{time_range}..."
     days = case time_range
            when "week" then 7
            when "month" then 30
            when "year" then 365
            else 7
            end
-    params = {
-      "per_page" => limit,
-      "top"      => days
-    }
+    puts "[Dev.to] Fetching top #{time_range} (top=#{days}, limit #{limit})..."
+    params = { "per_page" => limit, "top" => days }
     articles = fetch_articles(params)
     save_articles_to_db(articles)
   end
 
   def self.fetch_articles_by_tag(tag : String, limit : Int32 = DEFAULT_LIMIT) : Int32
-    puts "Fetching articles tagged with '#{tag}'..."
-    params = {
-      "per_page" => limit,
-      "tag"      => tag
-    }
+    puts "[Dev.to] Fetching tag '#{tag}' (limit #{limit})..."
+    params = { "per_page" => limit, "tag" => tag }
     articles = fetch_articles(params)
     save_articles_to_db(articles)
   end
 
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = DEFAULT_LIMIT) : Int32
-    total_saved = 0
-    begin
-      tags.each do |tag|
-        saved = fetch_articles_by_tag(tag, limit_per_tag)
-        total_saved += saved
-        puts "Fetched #{saved} articles for tag #{tag}"
-      end
-    rescue e : Exception
-      puts "Error fetching articles by tags: #{e.message}"
+    total = 0
+    tags.each do |tag|
+      saved = fetch_articles_by_tag(tag, limit_per_tag)
+      total += saved
+      puts "[Dev.to] Tag '#{tag}' saved #{saved} articles."
     end
-    total_saved
+    total
+  rescue e : Exception
+    puts "[Dev.to] fetch_articles_by_tags error: #{e.message}"
+    total
   end
 
   def self.full_fetch
-    puts "Starting full Dev.to fetch..."
-
+    puts "=== Starting Dev.to full fetch ==="
     saved_latest = fetch_latest_articles(100)
     saved_top_week = fetch_top_articles(100, "week")
     saved_top_month = fetch_top_articles(100, "month")
@@ -207,10 +241,10 @@ module DevToFetcher
     saved_tags = fetch_articles_by_tags(tags_to_fetch, 30)
 
     total = saved_latest + saved_top_week + saved_top_month + saved_tags
-    puts "Dev.to fetch complete. Total saved: #{total} articles"
+    puts "=== Dev.to complete. Total saved: #{total} articles ==="
     total
   rescue e : Exception
-    puts "Full fetch failed: #{e.message}"
+    puts "Dev.to full_fetch failed: #{e.message}"
     0
   end
 end
