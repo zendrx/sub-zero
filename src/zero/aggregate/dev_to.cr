@@ -1,5 +1,5 @@
 # dev_to.cr - Dev.to content fetcher for Crystal Aggregator
-# Final debug version with comprehensive nil handling.
+# Fixed version focusing strictly on the 3 core elements.
 
 require "http/client"
 require "json"
@@ -80,8 +80,7 @@ module DevToFetcher
       data = JSON.parse(body)
       array_data = data.as_a?
       unless array_data
-        puts "[Dev.to] Response is not an array. Type: #{typeof(data)}"
-        puts "[Dev.to] Preview: #{body[0..200]}"
+        puts "[Dev.to] Response is not an array. Preview: #{body[0..200]}"
         return articles
       end
 
@@ -89,17 +88,21 @@ module DevToFetcher
 
       array_data.each_with_index do |article, idx|
         begin
-          title = article["title"]?.try &.as_s || ""
-          url = article["url"]?.try &.as_s || ""
-          description = article["description"]?.try &.as_s || ""
-          published_at = article["published_at"]?.try &.as_s || ""
+          # Core 1, 2, and 3 extracted properly without .to_s string formatting pollution
+          title = article["title"]?.try(&.as_s) || ""
+          url = article["url"]?.try(&.as_s) || ""
+          description = article["description"]?.try(&.as_s) || ""
+          published_at = article["published_at"]?.try(&.as_s) || ""
+          
+          # Using Dev.to's actual unique API ID for external_id to avoid matching collissions
+          devto_id = article["id"]?.try(&.as_i64.to_s) || article["id"]?.try(&.as_i.to_s) || ""
 
           if title.empty? || url.empty?
             puts "[Dev.to] Article #{idx} skipped: missing title or URL."
             next
           end
 
-          external_id = url
+          external_id = !devto_id.empty? ? devto_id : url
           if external_id.empty?
             external_id = Digest::SHA256.hexdigest(title + published_at)
           end
@@ -111,13 +114,15 @@ module DevToFetcher
           article_data["published_at"] = JSON::Any.new(published_at)
           article_data["external_id"] = JSON::Any.new(external_id)
           article_data["source"] = JSON::Any.new("devto")
-          article_data["score"] = JSON::Any.new(0)
-          article_data["comment_count"] = JSON::Any.new(0)
+          
+          # Padded with zeroes as requested for your platform's native calculation metrics
+          article_data["score"] = JSON::Any.new(0_i64)
+          article_data["comment_count"] = JSON::Any.new(0_i64)
           article_data["is_user_post"] = JSON::Any.new(false)
 
           articles << article_data
           if idx < 3
-            puts "[Dev.to]   #{idx+1}. #{title[0..40]}... (id: #{external_id[0..12]})"
+            puts "[Dev.to]   #{idx+1}. #{title[0..40]}... (id: #{external_id})"
           end
         rescue e : Exception
           puts "[Dev.to] Error parsing article #{idx}: #{e.message}"
@@ -136,27 +141,25 @@ module DevToFetcher
     saved_count = 0
     return 0 if articles.empty?
 
-    puts "[Dev.to] Saving #{articles.size} articles..."
+    puts "[Dev.to] Saving #{articles.size} articles to database..."
     articles.each_with_index do |article, idx|
-      external_id = article["external_id"]?.to_s
+      external_id = article["external_id"]?.try(&.as_s) || ""
+      
       if external_id.empty?
         puts "[Dev.to] Article #{idx} missing external_id, skipping."
         next
       end
 
-      result = POOL.query(
-        "SELECT id FROM posts WHERE external_id = $1 AND source = 'devto'",
-        external_id
-      )
-      if result.move_next
-        puts "[Dev.to] Article #{external_id} already exists, skipping."
+      # Fixed pool exhaustion leak by safely utilizing scalar? (closes result sets instantly)
+      exists = POOL.scalar?("SELECT 1 FROM posts WHERE external_id = $1 AND source = 'devto'", external_id)
+      if exists
         next
       end
 
       begin
-        title = article["title"]?.to_s || "Untitled"
-        url = article["url"]?.to_s || ""
-        content = article["content"]?.to_s || ""
+        title = article["title"]?.try(&.as_s) || "Untitled"
+        url = article["url"]?.try(&.as_s) || ""
+        content = article["content"]?.try(&.as_s) || ""
 
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) 
@@ -166,9 +169,9 @@ module DevToFetcher
           content,
           "devto",
           external_id,
-          0,
-          0,
-          false
+          0,     # Native Score
+          0,     # Native Comment Count
+          false  # Native User Post Flag
         )
         saved_count += 1
         if saved_count <= 3
