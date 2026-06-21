@@ -1,4 +1,4 @@
-<!-- views/login.ecr - Login page for Sub Zero -->
+<!-- views/login.ecr - Log In page for Sub Zero -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,7 +18,7 @@
     }
     a { color: #0366d6; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .container { max-width: 440px; margin: 0 auto; padding: 0 16px; width: 100%; }
+    .container { max-width: 400px; margin: 0 auto; padding: 0 16px; width: 100%; }
 
     .header {
       background: #fff;
@@ -26,7 +26,7 @@
       padding: 12px 0;
     }
     .header-inner {
-      max-width: 440px;
+      max-width: 800px;
       margin: 0 auto;
       padding: 0 16px;
       display: flex;
@@ -41,127 +41,32 @@
     .logo a { color: #24292e; }
     .logo a:hover { text-decoration: none; }
 
-    .login-card {
-      background: #fff;
-      border-radius: 8px;
-      border: 1px solid #e1e4e8;
-      padding: 32px 24px;
-      margin-top: 40px;
-      margin-bottom: 40px;
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
     }
-    .login-card h1 {
+    .card {
+      background: #fff;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 32px 24px;
+      width: 100%;
+    }
+    .card h1 {
       font-size: 24px;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
+      text-align: center;
     }
-    .login-card .subtitle {
+    .card p {
       color: #586069;
       font-size: 14px;
+      text-align: center;
       margin-bottom: 24px;
     }
-    .form-group {
-      margin-bottom: 16px;
-    }
-    .form-group label {
-      display: block;
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 4px;
-      color: #24292e;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #e1e4e8;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: border-color 0.2s;
-      background: #fff;
-    }
-    .form-group input:focus {
-      outline: none;
-      border-color: #0366d6;
-      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
-    }
-    .form-group input.error {
-      border-color: #d73a49;
-    }
-    .form-group .error-text {
-      color: #d73a49;
-      font-size: 12px;
-      margin-top: 4px;
-      display: none;
-    }
-    .form-group .error-text.show { display: block; }
-    .form-options {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-    .form-options label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #586069;
-      font-weight: 400;
-      cursor: pointer;
-    }
-    .form-options label input[type="checkbox"] {
-      width: auto;
-      margin: 0;
-    }
-    .form-options a { font-size: 14px; }
-    .btn-submit {
-      width: 100%;
-      padding: 10px;
-      background: #0366d6;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-submit:hover { background: #0255b3; }
-    .btn-submit:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 20px 0;
-      color: #586069;
-      font-size: 12px;
-    }
-    .divider::before, .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: #e1e4e8;
-    }
-    .signup-link {
-      text-align: center;
-      font-size: 14px;
-      color: #586069;
-      margin-top: 16px;
-    }
-    .signup-link a { color: #0366d6; font-weight: 500; }
-    .signup-link a:hover { text-decoration: underline; }
-
-    .footer {
-      text-align: center;
-      padding: 24px 0;
-      color: #586069;
-      font-size: 13px;
-      border-top: 1px solid #e1e4e8;
-      margin-top: auto;
-    }
-    .footer p { margin: 4px 0; }
 
     .alert {
       padding: 12px 16px;
@@ -180,27 +85,70 @@
       color: #28a745;
     }
 
-    .demo-credentials {
-      background: #f6f8fa;
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #24292e;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e1e4e8;
       border-radius: 6px;
-      padding: 12px 16px;
-      margin-bottom: 16px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0366d6;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 10px;
+      background: #0366d6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover { background: #0255b3; }
+
+    .form-footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 14px;
+      color: #586069;
+    }
+    .form-footer a { color: #0366d6; }
+
+    .demo-creds {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e1e4e8;
+      text-align: center;
       font-size: 13px;
       color: #586069;
-      border: 1px dashed #e1e4e8;
     }
-    .demo-credentials code {
-      background: #fff;
+    .demo-creds code {
+      background: #f6f8fa;
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 12px;
-      border: 1px solid #e1e4e8;
     }
 
-    @media (max-width: 600px) {
-      .login-card { padding: 24px 16px; margin-top: 20px; }
-      .login-card h1 { font-size: 20px; }
-      .form-options { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      color: #586069;
+      font-size: 13px;
     }
   </style>
 </head>
@@ -208,152 +156,92 @@
   <header class="header">
     <div class="header-inner">
       <div class="logo">
-        <a href="/">Sub Zero</a>
+        <a href="/">❄️ Sub Zero</a>
       </div>
-      <a href="/signup" style="font-size:14px;">Sign Up</a>
     </div>
   </header>
 
-  <main class="container">
-    <div class="login-card">
-      <h1>Welcome back</h1>
-      <p class="subtitle">Log in to your account to continue.</p>
+  <main class="main">
+    <div class="container">
+      <div class="card">
+        <h1>Welcome back</h1>
+        <p>Log in to your account to continue.</p>
 
-      <% if flash(env)["error"]? %>
-        <div class="alert alert-error"><%= flash(env)["error"]? %></div>
-      <% end %>
-      <% if flash(env)["success"]? %>
-        <div class="alert alert-success"><%= flash(env)["success"]? %></div>
-      <% end %>
-      <% if env.params.query["registered"]? %>
-        <div class="alert alert-success">Account created successfully! Please log in.</div>
-      <% end %>
+        <% if flash(env)["error"]? %>
+          <div class="alert alert-error"><%= flash(env)["error"]? %></div>
+        <% end %>
+        <% if flash(env)["success"]? %>
+          <div class="alert alert-success"><%= flash(env)["success"]? %></div>
+        <% end %>
+        <% if env.params.query["registered"]? %>
+          <div class="alert alert-success">Account created successfully! Please log in.</div>
+        <% end %>
 
-      <form action="/login" method="POST" id="loginForm" x-data="loginForm()" @submit.prevent="submit">
-        <div class="form-group">
-          <label for="identifier">Username or Email</label>
-          <input type="text" id="identifier" name="identifier" 
-                 x-model="identifier"
-                 :class="{ error: errors.identifier }"
-                 required
-                 placeholder="Enter your username or email">
-          <div class="error-text" :class="{ show: errors.identifier }" x-text="errors.identifier"></div>
+        <form action="/api/auth/login" method="post" id="loginForm">
+          <div class="form-group">
+            <label for="identifier">Username or Email</label>
+            <input type="text" id="identifier" name="identifier" required autofocus>
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+          </div>
+          <button type="submit" class="btn-submit">Log In</button>
+        </form>
+
+        <div class="form-footer">
+          Don't have an account? <a href="/signup">Sign Up</a>
         </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" 
-                 x-model="password"
-                 :class="{ error: errors.password }"
-                 required
-                 placeholder="Enter your password">
-          <div class="error-text" :class="{ show: errors.password }" x-text="errors.password"></div>
-        </div>
-
-        <div class="form-options">
-          <label>
-            <input type="checkbox" name="remember" x-model="remember">
-            Remember me
-          </label>
-          <a href="/forgot-password">Forgot password?</a>
-        </div>
-
-        <button type="submit" class="btn-submit" :disabled="loading">
-          <span x-show="!loading">Log In</span>
-          <span x-show="loading">Logging in...</span>
-        </button>
-
-        <div class="demo-credentials">
+        <div class="demo-creds">
           <strong>Demo Credentials:</strong><br>
           Username: <code>demo</code> &nbsp;|&nbsp; Password: <code>demopass</code>
         </div>
-      </form>
-
-      <div class="signup-link">
-        Don't have an account? <a href="/signup">Sign Up</a>
       </div>
     </div>
   </main>
 
   <footer class="footer">
-    <div class="container">
-      <p>Sub Zero — Content from Reddit, Hacker News & Dev.to</p>
-    </div>
+    <p>❄️ Sub Zero — Built with Crystal & Kemal</p>
   </footer>
 
-  <script src="https://unpkg.com/alpinejs@3.13.3" defer></script>
   <script>
-    function loginForm() {
-      return {
-        identifier: '',
-        password: '',
-        remember: false,
-        loading: false,
-        errors: {
-          identifier: '',
-          password: ''
-        },
-        validate() {
-          let valid = true;
-          this.errors = { identifier: '', password: '' };
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const identifier = document.getElementById('identifier').value;
+      const password = document.getElementById('password').value;
 
-          if (!this.identifier || this.identifier.trim() === '') {
-            this.errors.identifier = 'Please enter your username or email';
-            valid = false;
-          }
-
-          if (!this.password || this.password.length < 1) {
-            this.errors.password = 'Please enter your password';
-            valid = false;
-          }
-
-          return valid;
-        },
-        submit() {
-          if (!this.validate()) return;
-
-          this.loading = true;
-
-          fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              identifier: this.identifier.trim(),
-              password: this.password
-            })
-          })
-          .then(res => res.json())
-          .then(data => {
-            this.loading = false;
-            if (data.status === 'success') {
-              window.location.href = '/';
-            } else {
-              this.errors.password = data.message || 'Invalid username or password';
-              // Also show as alert
-              const alert = document.createElement('div');
-              alert.className = 'alert alert-error';
-              alert.textContent = data.message || 'Invalid username or password';
-              const form = document.getElementById('loginForm');
-              const existingAlert = form.querySelector('.alert');
-              if (existingAlert) existingAlert.remove();
-              form.prepend(alert);
-              setTimeout(() => alert.remove(), 5000);
-            }
-          })
-          .catch(() => {
-            this.loading = false;
-            const alert = document.createElement('div');
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identifier, password: password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          window.location.href = '/';
+        } else {
+          const card = document.querySelector('.card');
+          let alert = card.querySelector('.alert-error');
+          if (!alert) {
+            alert = document.createElement('div');
             alert.className = 'alert alert-error';
-            alert.textContent = 'Something went wrong. Please try again.';
-            const form = document.getElementById('loginForm');
-            const existingAlert = form.querySelector('.alert');
-            if (existingAlert) existingAlert.remove();
-            form.prepend(alert);
-            setTimeout(() => alert.remove(), 5000);
-          });
+            card.insertBefore(alert, card.querySelector('form'));
+          }
+          alert.textContent = data.message || 'Invalid username or password';
         }
-      };
-    }
+      })
+      .catch(() => {
+        const card = document.querySelector('.card');
+        let alert = card.querySelector('.alert-error');
+        if (!alert) {
+          alert = document.createElement('div');
+          alert.className = 'alert alert-error';
+          card.insertBefore(alert, card.querySelector('form'));
+        }
+        alert.textContent = 'Something went wrong. Please try again.';
+      });
+    });
   </script>
 </body>
 </html>
