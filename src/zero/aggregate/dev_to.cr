@@ -132,7 +132,8 @@ module DevToFetcher
             articles << article_data
 
             if index < 3
-              puts "  Article #{index+1}: #{title[0..30]}... (ID: #{external_id || 'NONE'})"
+              # Fixed: use double quotes for strings
+              puts "  Article #{index+1}: #{title[0..30]}... (ID: #{external_id || "NONE"})"
             end
           rescue e : Exception
             puts "Error parsing article #{index}: #{e.message}"
@@ -286,7 +287,6 @@ module DevToFetcher
     saved_top_week = fetch_top_articles(100, "week")
     saved_top_month = fetch_top_articles(100, "month")
 
-    # Fetch from more tags for better coverage
     tags_to_fetch = ["ruby", "python", "javascript", "react", "rails", "go", "rust", "devops", "webdev", "ai"]
     saved_tags = fetch_articles_by_tags(tags_to_fetch, 30)
 
