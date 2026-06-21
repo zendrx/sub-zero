@@ -89,7 +89,6 @@ module DevToFetcher
 
       array_data.each_with_index do |article, idx|
         begin
-          # Safely extract values with nil checks
           title = article["title"]?.try &.as_s || ""
           url = article["url"]?.try &.as_s || ""
           description = article["description"]?.try &.as_s || ""
@@ -100,13 +99,11 @@ module DevToFetcher
             next
           end
 
-          # Generate unique external_id from URL, fallback to hash
           external_id = url
           if external_id.empty?
             external_id = Digest::SHA256.hexdigest(title + published_at)
           end
 
-          # Build minimal article data
           article_data = Hash(String, JSON::Any).new
           article_data["title"] = JSON::Any.new(title)
           article_data["url"] = JSON::Any.new(url)
@@ -147,7 +144,6 @@ module DevToFetcher
         next
       end
 
-      # Check existence
       result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'devto'",
         external_id
@@ -190,7 +186,6 @@ module DevToFetcher
     0
   end
 
-  # High-level fetch methods
   def self.fetch_latest_articles(limit : Int32 = DEFAULT_LIMIT) : Int32
     puts "[Dev.to] Fetching latest (limit #{limit})..."
     params = { "per_page" => limit, "state" => "fresh" }
@@ -220,14 +215,15 @@ module DevToFetcher
 
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = DEFAULT_LIMIT) : Int32
     total = 0
-    tags.each do |tag|
-      saved = fetch_articles_by_tag(tag, limit_per_tag)
-      total += saved
-      puts "[Dev.to] Tag '#{tag}' saved #{saved} articles."
+    begin
+      tags.each do |tag|
+        saved = fetch_articles_by_tag(tag, limit_per_tag)
+        total += saved
+        puts "[Dev.to] Tag '#{tag}' saved #{saved} articles."
+      end
+    rescue e : Exception
+      puts "[Dev.to] fetch_articles_by_tags error: #{e.message}"
     end
-    total
-  rescue e : Exception
-    puts "[Dev.to] fetch_articles_by_tags error: #{e.message}"
     total
   end
 
