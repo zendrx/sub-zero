@@ -1,5 +1,3 @@
-# db_algo.cr - Algorithm database layer for Crystal Aggregator
-
 require "pg"
 require "json"
 require "time"
@@ -9,7 +7,7 @@ module AlgoDB
   def self.record_interaction(user_id : Int64, post_id : Int64, interaction_type : String, weight : Float64 = 1.0)
     POOL.exec(
       "INSERT INTO user_interactions (user_id, post_id, interaction_type, weight, created_at)
-       VALUES ($1, $2, $3, $4, NOW())",
+      VALUES ($1, $2, $3, $4, NOW())",
       user_id, post_id, interaction_type, weight
     )
 
@@ -32,12 +30,12 @@ module AlgoDB
     title = result.read(String)
 
     interaction_weights = {
-      "upvote"   => 2.0,
-      "comment"  => 1.5,
-      "save"     => 1.5,
-      "share"    => 2.5,
-      "view"     => 0.5,
-      "click"    => 0.8,
+      "upvote" => 2.0,
+      "comment" => 1.5,
+      "save" => 1.5,
+      "share" => 2.5,
+      "view" => 0.5,
+      "click" => 0.8,
       "downvote" => -1.0,
     }
 
@@ -45,10 +43,10 @@ module AlgoDB
 
     POOL.exec(
       "INSERT INTO user_source_preferences (user_id, source, score, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (user_id, source) DO UPDATE
-       SET score = user_source_preferences.score + $3,
-           updated_at = NOW()",
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (user_id, source) DO UPDATE
+      SET score = user_source_preferences.score + $3,
+          updated_at = NOW()",
       user_id, source, effective_weight
     )
 
@@ -56,10 +54,10 @@ module AlgoDB
     tags.each do |tag|
       POOL.exec(
         "INSERT INTO user_tag_preferences (user_id, tag, score, updated_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (user_id, tag) DO UPDATE
-         SET score = user_tag_preferences.score + $3,
-             updated_at = NOW()",
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (user_id, tag) DO UPDATE
+        SET score = user_tag_preferences.score + $3,
+            updated_at = NOW()",
         user_id, tag, effective_weight * 0.5
       )
     end
@@ -262,12 +260,12 @@ module AlgoDB
   def self.get_user_stats(user_id : Int64) : Hash(String, JSON::Any)
     result = POOL.query(
       "SELECT
-         COUNT(DISTINCT post_id) as posts_interacted,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'upvote') as upvotes,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'downvote') as downvotes,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'comment') as comments,
-         COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'save') as saves,
-         COUNT(DISTINCT source) as sources_used
+        COUNT(DISTINCT post_id) as posts_interacted,
+        COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'upvote') as upvotes,
+        COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'downvote') as downvotes,
+        COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'comment') as comments,
+        COUNT(DISTINCT post_id) FILTER (WHERE interaction_type = 'save') as saves,
+        COUNT(DISTINCT source) as sources_used
        FROM user_interactions
        WHERE user_id = $1",
       user_id
@@ -292,9 +290,9 @@ end
 def setup_algo_tables
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS user_interactions (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+      post_id BIGINT REFERENCES posts(id) ON DELETE CASCADE,
       interaction_type TEXT NOT NULL,
       weight FLOAT DEFAULT 1.0,
       created_at TIMESTAMP DEFAULT NOW()
@@ -303,8 +301,8 @@ def setup_algo_tables
 
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS user_source_preferences (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
       source TEXT NOT NULL,
       score FLOAT DEFAULT 0.0,
       updated_at TIMESTAMP DEFAULT NOW(),
@@ -314,8 +312,8 @@ def setup_algo_tables
 
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS user_tag_preferences (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
       tag TEXT NOT NULL,
       score FLOAT DEFAULT 0.0,
       updated_at TIMESTAMP DEFAULT NOW(),

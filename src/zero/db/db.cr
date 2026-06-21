@@ -1,12 +1,10 @@
-# db.cr - Database layer for Crystal Aggregator
-
 require "pg"
 require "json"
 
 def setup_database
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
+      id BIGSERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
@@ -18,13 +16,13 @@ def setup_database
 
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS posts (
-      id SERIAL PRIMARY KEY,
+      id BIGSERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       url TEXT,
       content TEXT,
       source TEXT NOT NULL,
       external_id TEXT,
-      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
       score INTEGER DEFAULT 0,
       comment_count INTEGER DEFAULT 0,
       is_user_post BOOLEAN DEFAULT FALSE,
@@ -35,10 +33,10 @@ def setup_database
 
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS comments (
-      id SERIAL PRIMARY KEY,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+      id BIGSERIAL PRIMARY KEY,
+      post_id BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+      user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      parent_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       score INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -48,10 +46,10 @@ def setup_database
 
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS votes (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-      comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+      post_id BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+      comment_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
       vote_type INTEGER NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       CONSTRAINT vote_target_check CHECK (
@@ -65,9 +63,9 @@ def setup_database
 
   POOL.exec <<-SQL
     CREATE TABLE IF NOT EXISTS saved_posts (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+      post_id BIGINT REFERENCES posts(id) ON DELETE CASCADE,
       created_at TIMESTAMP DEFAULT NOW(),
       CONSTRAINT unique_user_post_save UNIQUE (user_id, post_id)
     )
@@ -79,6 +77,8 @@ def setup_database
   POOL.exec "CREATE INDEX IF NOT EXISTS idx_votes_user_id ON votes(user_id)"
   POOL.exec "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
   POOL.exec "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)"
+  POOL.exec "CREATE INDEX IF NOT EXISTS idx_posts_external_id ON posts(external_id)"
+  POOL.exec "CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)"
 end
 
 def db_healthy? : Bool
