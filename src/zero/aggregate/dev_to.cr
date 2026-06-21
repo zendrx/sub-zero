@@ -1,13 +1,12 @@
 # dev_to.cr - Dev.to content fetcher for Crystal Aggregator
-# Official API docs: https://developers.forem.com/api/v1#tag/articles/operation/getArticles
 
 require "http/client"
 require "json"
+require "digest/sha256"
 
 module DevToFetcher
   BASE_URL = "https://dev.to/api"
   DEFAULT_LIMIT = 30
-  FETCH_LIMIT = 100
 
   POPULAR_TAGS = [
     "ruby", "python", "javascript", "react", "rails", "go", "rust",
@@ -36,22 +35,13 @@ module DevToFetcher
 
     if api_key = ENV["DEV_TO"]?
       headers["api-key"] = api_key
-      puts "Dev.to API key found"
-    else
-      puts "DEV_TO not set. Only public articles will be fetched."
     end
 
     response = HTTP::Client.get(url, headers: headers)
-    puts "Dev.to response status: #{response.status_code}"
 
     case response.status_code
     when 200
-      articles = parse_articles_response(response.body)
-      puts "Dev.to parsed #{articles.size} articles"
-      articles
-    when 401
-      puts "Dev.to API authentication failed. Check your DEV_TO environment variable."
-      [] of Hash(String, JSON::Any)
+      parse_articles_response(response.body)
     when 429
       puts "Rate limited by Dev.to, waiting 30 seconds..."
       sleep 30
@@ -77,115 +67,49 @@ module DevToFetcher
       articles = [] of Hash(String, JSON::Any)
 
       array_data = data.as_a?
+      return articles unless array_data
 
-      if array_data
-        puts "Dev.to has #{array_data.size} items in array"
+      array_data.each do |article|
+        title = article["title"]?.try &.as_s || "Untitled"
+        url = article["url"]?.try &.as_s || ""
+        description = article["description"]?.try &.as_s || ""
+        published_at = article["published_at"]?.try &.as_s || ""
 
-        array_data.each_with_index do |article, index|
-          begin
-            title = article["title"]?.try &.as_s || ""
-            url = article["url"]?.try &.as_s || ""
-            description = article["description"]?.try &.as_s || ""
-            cover_image = article["cover_image"]?.try &.as_s || ""
-            published_at = article["published_at"]?.try &.as_s || ""
-            
-            tag_list_value = article["tag_list"]?
-            tag_list = case tag_list_value
-                       when String
-                         tag_list_value
-                       when Array
-                         tag_list_value.join(", ")
-                       else
-                         ""
-                       end
-
-            positive_reactions_count = 0
-            if reactions = article["positive_reactions_count"]?
-              positive_reactions_count = reactions.as_i
-            elsif reactions = article["public_reactions_count"]?
-              positive_reactions_count = reactions.as_i
-            end
-
-            comments_count = article["comments_count"]?.try &.as_i || 0
-            
-            external_id = article["id"]?
-            external_id_str = case external_id
-                             when Int64
-                               external_id.to_s
-                             when String
-                               external_id
-                             else
-                               ""
-                             end
-            
-            reading_time_minutes = article["reading_time_minutes"]?.try &.as_i || 0
-
-            user = article["user"]?
-            user_name = user ? user["name"]?.try &.as_s || "" : ""
-            user_username = user ? user["username"]?.try &.as_s || "" : ""
-
-            organisation = article["organization"]?
-            org_name = organisation ? organisation["name"]?.try &.as_s || "" : ""
-
-            content = description
-            tags = tag_list
-
-            article_data = Hash(String, JSON::Any).new
-            article_data["title"] = JSON::Any.new(title)
-            article_data["url"] = JSON::Any.new(url)
-            article_data["content"] = JSON::Any.new(content)
-            article_data["cover_image"] = JSON::Any.new(cover_image)
-            article_data["source"] = JSON::Any.new("devto")
-            article_data["external_id"] = JSON::Any.new(external_id_str)
-            article_data["score"] = JSON::Any.new(positive_reactions_count)
-            article_data["comment_count"] = JSON::Any.new(comments_count)
-            article_data["is_user_post"] = JSON::Any.new(false)
-            article_data["published_at"] = JSON::Any.new(published_at)
-            article_data["tags"] = JSON::Any.new(tags)
-            article_data["author_name"] = JSON::Any.new(user_name)
-            article_data["author_username"] = JSON::Any.new(user_username)
-            article_data["reading_time"] = JSON::Any.new(reading_time_minutes)
-            article_data["org_name"] = JSON::Any.new(org_name)
-
-            articles << article_data
-
-            if index < 3
-              puts "  Article #{index+1}: #{title[0..30]}... (ID: #{external_id_str || "NONE"})"
-            end
-          rescue e : Exception
-            puts "Error parsing article #{index}: #{e.message}"
-          end
+        # Generate unique external_id from URL
+        external_id = url
+        if external_id.empty?
+          external_id = Digest::SHA256.hexdigest(title + published_at)
         end
-      else
-        puts "Response is not an array: #{typeof(data)}"
-        puts "Response preview: #{body[0..200]}"
+
+        # Build minimal article data
+        article_data = Hash(String, JSON::Any).new
+        article_data["title"] = JSON::Any.new(title)
+        article_data["url"] = JSON::Any.new(url)
+        article_data["content"] = JSON::Any.new(description)
+        article_data["published_at"] = JSON::Any.new(published_at)
+        article_data["external_id"] = JSON::Any.new(external_id)
+        article_data["source"] = JSON::Any.new("devto")
+        article_data["score"] = JSON::Any.new(0)
+        article_data["comment_count"] = JSON::Any.new(0)
+        article_data["is_user_post"] = JSON::Any.new(false)
+
+        articles << article_data
       end
 
       articles
-    rescue e : JSON::ParseException
-      puts "Failed to parse JSON: #{e.message}"
-      puts "Response preview: #{body[0..200]}"
+    rescue e : Exception
+      puts "Error parsing Dev.to response: #{e.message}"
       [] of Hash(String, JSON::Any)
     end
   end
 
   def self.save_articles_to_db(articles : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
+    return 0 if articles.empty?
 
-    if articles.empty?
-      puts "No articles to save to database"
-      return 0
-    end
-
-    puts "Attempting to save #{articles.size} articles to database..."
-
-    articles.each_with_index do |article, index|
+    articles.each do |article|
       external_id = article["external_id"]?.to_s
-
-      if external_id.empty?
-        puts "Article #{index} has no external_id, skipping"
-        next
-      end
+      next if external_id.empty?
 
       result = POOL.query(
         "SELECT id FROM posts WHERE external_id = $1 AND source = 'devto'",
@@ -193,7 +117,6 @@ module DevToFetcher
       )
 
       if result.move_next
-        puts "  Article #{external_id} already exists in DB"
         next
       end
 
@@ -202,8 +125,6 @@ module DevToFetcher
         url = article["url"]?.to_s || ""
         content = article["content"]?.to_s || ""
         source = "devto"
-        score = article["score"]?.try &.as_i || 0
-        comment_count = article["comment_count"]?.try &.as_i || 0
 
         POOL.exec(
           "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) 
@@ -213,25 +134,18 @@ module DevToFetcher
           content,
           source,
           external_id,
-          score,
-          comment_count,
+          0,
+          0,
           false
         )
         saved_count += 1
-
-        if saved_count <= 5
-          puts "  Saved article: #{title[0..40]}..."
-        end
       rescue e : PG::Error
         puts "Database error for article #{external_id}: #{e.message}"
       end
     end
 
-    puts "Successfully saved #{saved_count} new articles to database"
+    puts "Saved #{saved_count} new Dev.to articles"
     saved_count
-  rescue e : Exception
-    puts "Unexpected error saving articles: #{e.message}"
-    0
   end
 
   def self.fetch_latest_articles(limit : Int32 = DEFAULT_LIMIT) : Int32
@@ -241,11 +155,7 @@ module DevToFetcher
       "state"    => "fresh"
     }
     articles = fetch_articles(params)
-    puts "Got #{articles.size} latest articles"
-    saved = save_articles_to_db(articles)
-    puts "Saved #{saved} latest articles"
-    sleep 2
-    saved
+    save_articles_to_db(articles)
   end
 
   def self.fetch_top_articles(limit : Int32 = DEFAULT_LIMIT, time_range : String = "week") : Int32
@@ -261,40 +171,28 @@ module DevToFetcher
       "top"      => days
     }
     articles = fetch_articles(params)
-    puts "Got #{articles.size} top articles for #{time_range}"
-    saved = save_articles_to_db(articles)
-    puts "Saved #{saved} top articles for #{time_range}"
-    sleep 2
-    saved
+    save_articles_to_db(articles)
   end
 
   def self.fetch_articles_by_tag(tag : String, limit : Int32 = DEFAULT_LIMIT) : Int32
-    puts "Fetching articles tagged with '#{tag}' from Dev.to..."
+    puts "Fetching articles tagged with '#{tag}'..."
     params = {
       "per_page" => limit,
       "tag"      => tag
     }
     articles = fetch_articles(params)
-    puts "Got #{articles.size} articles tagged with '#{tag}'"
-    saved = save_articles_to_db(articles)
-    puts "Saved #{saved} articles tagged with '#{tag}'"
-    sleep 1
-    saved
+    save_articles_to_db(articles)
   end
 
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = DEFAULT_LIMIT) : Int32
     total_saved = 0
-
-    begin
-      tags.each do |tag|
-        saved = fetch_articles_by_tag(tag, limit_per_tag)
-        total_saved += saved
-        puts "Fetched #{saved} articles for tag #{tag}"
-      end
-    rescue e : Exception
-      puts "Error fetching articles by tags: #{e.message}"
+    tags.each do |tag|
+      saved = fetch_articles_by_tag(tag, limit_per_tag)
+      total_saved += saved
     end
-
+    total_saved
+  rescue e : Exception
+    puts "Error fetching articles by tags: #{e.message}"
     total_saved
   end
 
