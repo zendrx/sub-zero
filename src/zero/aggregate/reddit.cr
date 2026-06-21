@@ -1,13 +1,11 @@
 # reddit.cr - Reddit content fetcher for Crystal Aggregator
-# Fetches posts from multiple subreddits and stores them in the database
+# Production-ready version focusing strictly on the 3 core elements with anti-blocking safeguards.
 
 require "http/client"
 require "json"
 
 module RedditFetcher
-  # Configuration
-  USER_AGENT = "CrystalAggregator/1.0 (by /zen/zendrx)"
-  BASE_URL   = "https://www.reddit.com"
+  BASE_URL = "https://www.reddit.com"
 
   # List of subreddits to fetch from
   SUBREDDITS = ["all", "popular", "AskReddit", "worldnews", "technology", "science", "programming", "funny", "pics", "videos"]
@@ -15,199 +13,189 @@ module RedditFetcher
   # Number of posts to fetch per subreddit
   LIMIT_PER_SUBREDDIT = 25
 
-  # Different sorting methods
-  SORT_TYPES = ["hot", "new", "top", "rising", "controversial"]
-
-  # Time ranges for top/controversial sorting
-  TIME_RANGES = ["hour", "day", "week", "month", "year", "all"]
+  # Rotates headers cleanly to simulate valid traffic
+  def self.generate_browser_headers : HTTP::Headers
+    user_agents = [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15"
+    ]
+    
+    HTTP::Headers{
+      "User-Agent"      => user_agents.sample,
+      "Accept"          => "application/json, text/plain, */*",
+      "Accept-Language" => "en-US,en;q=0.9",
+      "Cache-Control"   => "no-cache",
+      "Pragma"          => "no-cache"
+    }
+  end
 
   # Fetches posts from a specific subreddit with given sort type
   def self.fetch_subreddit(subreddit : String, sort : String = "hot", time : String = "day", limit : Int32 = LIMIT_PER_SUBREDDIT) : Array(Hash(String, JSON::Any))
-    # Build the URL based on sort type
     url = case sort
-          when "hot"
-            "#{BASE_URL}/r/#{subreddit}/hot.json?limit=#{limit}"
-          when "new"
-            "#{BASE_URL}/r/#{subreddit}/new.json?limit=#{limit}"
-          when "top"
-            "#{BASE_URL}/r/#{subreddit}/top.json?limit=#{limit}&t=#{time}"
-          when "rising"
-            "#{BASE_URL}/r/#{subreddit}/rising.json?limit=#{limit}"
-          when "controversial"
-            "#{BASE_URL}/r/#{subreddit}/controversial.json?limit=#{limit}&t=#{time}"
-          else
-            "#{BASE_URL}/r/#{subreddit}/hot.json?limit=#{limit}"
+          when "hot"           then "#{BASE_URL}/r/#{subreddit}/hot.json?limit=#{limit}"
+          when "new"           then "#{BASE_URL}/r/#{subreddit}/new.json?limit=#{limit}"
+          when "top"           then "#{BASE_URL}/r/#{subreddit}/top.json?limit=#{limit}&t=#{time}"
+          when "rising"        then "#{BASE_URL}/r/#{subreddit}/rising.json?limit=#{limit}"
+          when "controversial" then "#{BASE_URL}/r/#{subreddit}/controversial.json?limit=#{limit}&t=#{time}"
+          else                      "#{BASE_URL}/r/#{subreddit}/hot.json?limit=#{limit}"
           end
 
-    # Make the request
-    response = HTTP::Client.get(url, headers: HTTP::Headers{"User-Agent" => USER_AGENT})
+    headers = generate_browser_headers
+    response = HTTP::Client.get(url, headers: headers)
 
-    # Check if request was successful
     if response.status_code == 200
       parse_reddit_response(response.body)
     elsif response.status_code == 429
-      puts "Rate limited by Reddit, waiting 60 seconds..."
-      sleep 60
-      # Retry once
-      response = HTTP::Client.get(url, headers: HTTP::Headers{"User-Agent" => USER_AGENT})
+      puts "[Reddit] Rate limited by Reddit. Sleeping for 30 seconds..."
+      sleep 30
+      
+      # Retry with unique randomized headers
+      response = HTTP::Client.get(url, headers: generate_browser_headers)
       if response.status_code == 200
         parse_reddit_response(response.body)
       else
-        puts "Failed to fetch from r/#{subreddit}: #{response.status_code}"
+        puts "[Reddit] Failed to fetch after retry from r/#{subreddit}: #{response.status_code}"
         [] of Hash(String, JSON::Any)
       end
     else
-      puts "Failed to fetch from r/#{subreddit}: #{response.status_code}"
+      puts "[Reddit] Failed to fetch from r/#{subreddit}: #{response.status_code}"
       [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
-    puts "Error fetching r/#{subreddit}: #{e.message}"
+    puts "[Reddit] Error fetching r/#{subreddit}: #{e.message}"
     [] of Hash(String, JSON::Any)
   end
 
-  # Parses the JSON response from Reddit
+  # Parses the JSON response from Reddit focusing on core values
   def self.parse_reddit_response(body : String) : Array(Hash(String, JSON::Any))
+    posts = [] of Hash(String, JSON::Any)
     begin
       data = JSON.parse(body)
-      posts = [] of Hash(String, JSON::Any)
 
-      # Navigate the Reddit JSON structure
-      if children = data["data"]? && data["data"]["children"]?
+      if children = data["data"]?["children"]?
         children.as_a.each do |child|
           if post_data = child["data"]?
-            # Extract post information - use .as_i for integers
-            title = post_data["title"]?.to_s
-            url = post_data["url"]?.to_s
-            permalink = post_data["permalink"]?.to_s
-            score = post_data["score"]?.try &.as_i || 0
-            comment_count = post_data["num_comments"]?.try &.as_i || 0
-            external_id = post_data["id"]?.to_s
-            subreddit = post_data["subreddit"]?.to_s
-            created_utc = post_data["created_utc"]?.try &.as_i || 0
-            author = post_data["author"]?.to_s
-            is_self = post_data["is_self"]?.try &.as_bool || false
-            selftext = post_data["selftext"]?.to_s || ""
+            # Core 1, 2, and 3 extracted cleanly without JSON value pollution
+            title = post_data["title"]?.try(&.as_s) || "Untitled"
+            url = post_data["url"]?.try(&.as_s) || ""
+            selftext = post_data["selftext"]?.try(&.as_s) || ""
+            is_self = post_data["is_self"]?.try(&.as_bool) || false
+            
+            # Structural primary key unique identifier
+            external_id = post_data["id"]?.try(&.as_s) || ""
 
-            # For self-posts, use the selftext as content
-            # For link posts, use the URL
+            if title.empty? || external_id.empty?
+              next
+            end
+
+            # Ensure text fallback content values are handled for native presentation
             content = is_self ? selftext : ""
+            if url.empty? && post_data["permalink"]?
+              url = "https://www.reddit.com" + post_data["permalink"].as_s
+            end
 
-            # Build the post hash using JSON::Any
             post = Hash(String, JSON::Any).new
             post["title"] = JSON::Any.new(title)
             post["url"] = JSON::Any.new(url)
             post["content"] = JSON::Any.new(content)
             post["source"] = JSON::Any.new("reddit")
             post["external_id"] = JSON::Any.new(external_id)
-            post["subreddit"] = JSON::Any.new(subreddit)
-            post["author"] = JSON::Any.new(author)
-            post["score"] = JSON::Any.new(score)
-            post["comment_count"] = JSON::Any.new(comment_count)
-            post["is_self"] = JSON::Any.new(is_self)
-            post["created_utc"] = JSON::Any.new(created_utc)
-            post["permalink"] = JSON::Any.new(permalink)
+            
+            # Zero padding variables for safety
+            post["score"] = JSON::Any.new(0_i64)
+            post["comment_count"] = JSON::Any.new(0_i64)
             post["is_user_post"] = JSON::Any.new(false)
 
             posts << post
           end
         end
       end
-
       posts
-    rescue e : JSON::ParseException
-      puts "Failed to parse JSON: #{e.message}"
+    rescue e : Exception
+      puts "[Reddit] Failed to parse JSON body context: #{e.message}"
       [] of Hash(String, JSON::Any)
     end
   end
 
-  # Saves fetched posts to the database, skipping duplicates
+  # Saves fetched posts to the database, skipping duplicates safely
   def self.save_posts_to_db(posts : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
+    return 0 if posts.empty?
 
     posts.each do |post|
-      external_id = post["external_id"]?.to_s
+      external_id = post["external_id"]?.try(&.as_s) || ""
       next if external_id.empty?
 
-      # Check if post already exists using query
-      result = POOL.query(
-        "SELECT id FROM posts WHERE external_id = $1 AND source = 'reddit'",
-        external_id
-      )
+      # Use scalar? to fix the database pool starvation connection leaks
+      exists = POOL.scalar?("SELECT 1 FROM posts WHERE external_id = $1 AND source = 'reddit'", external_id)
+      if exists
+        next
+      end
 
-      if !result.move_next
-        # Insert new post - use as_i for integer values
+      begin
+        title = post["title"]?.try(&.as_s) || "Untitled"
+        url = post["url"]?.try(&.as_s) || ""
+        content = post["content"]?.try(&.as_s) || ""
+
         POOL.exec(
-          "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          post["title"]?.to_s || "Untitled",
-          post["url"]?.to_s || "",
-          post["content"]?.to_s || "",
-          post["source"]?.to_s || "reddit",
-          post["external_id"]?.to_s || "",
-          post["score"]?.try &.as_i || 0,
-          post["comment_count"]?.try &.as_i || 0,
-          false
+          "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+          title,
+          url,
+          content,
+          "reddit",
+          external_id,
+          0,     # Native Score padded to zero
+          0,     # Native Comment Count padded to zero
+          false  # Native User Post Flag
         )
         saved_count += 1
+      rescue e : PG::Error
+        puts "[Reddit] Database error while inserting story #{external_id}: #{e.message}"
       end
     end
 
     saved_count
-  rescue e : PG::Error
-    puts "Database error while saving posts: #{e.message}"
+  rescue e : Exception
+    puts "[Reddit] Error inside save_posts_to_db context: #{e.message}"
     0
   end
 
-  # Fetches posts from multiple subreddits with different sorting methods
+  # Fetches posts across subreddits carefully without rapid simultaneous pounding
   def self.fetch_multi_subreddits(subreddits : Array(String) = SUBREDDITS, sort : String = "hot", time : String = "day") : Int32
     total_saved = 0
 
-    begin
-      # Use fibers for concurrent fetching
-      channels = subreddits.map do |sub|
-        Channel(Array(Hash(String, JSON::Any))).new
-      end
-
-      subreddits.each_with_index do |sub, index|
-        spawn do
-          posts = fetch_subreddit(sub, sort, time)
-          channels[index].send(posts)
-        end
-      end
-
-      # Collect and save results
-      subreddits.each_with_index do |sub, index|
-        posts = channels[index].receive
-        saved = save_posts_to_db(posts)
-        total_saved += saved
-        puts "Saved #{saved} posts from r/#{sub}"
-      end
-    rescue e : Exception
-      puts "Error in multi-subreddit fetch: #{e.message}"
+    subreddits.each do |sub|
+      puts "[Reddit] Requesting content listings from r/#{sub}..."
+      posts = fetch_subreddit(sub, sort, time)
+      saved = save_posts_to_db(posts)
+      total_saved += saved
+      puts "[Reddit] Processed and saved #{saved} stories from r/#{sub}"
+      
+      # Explicit defensive wait step to simulate realistic interactive browser habits
+      sleep 2.5
     end
 
     total_saved
   end
 
-  # Fetches posts using multiple sorting methods
   def self.fetch_with_multiple_sorts(subreddit : String = "all", sorts : Array(String) = ["hot", "new", "top"]) : Int32
     total_saved = 0
 
     sorts.each do |sort|
-      time = sort == "top" || sort == "controversial" ? "day" : ""
+      time = (sort == "top" || sort == "controversial") ? "day" : ""
       posts = fetch_subreddit(subreddit, sort, time)
       saved = save_posts_to_db(posts)
       total_saved += saved
-      puts "Saved #{saved} posts from r/#{subreddit} with sort '#{sort}'"
-      sleep 1 # Be nice to Reddit's API
+      puts "[Reddit] Saved #{saved} posts from r/#{subreddit} with sort '#{sort}'"
+      sleep 2.5
     end
 
     total_saved
-  rescue e : Exception
-    puts "Error fetching with multiple sorts: #{e.message}"
-    total_saved
   end
 
-  # Fetches popular posts from various time ranges
   def self.fetch_top_time_ranges(subreddit : String = "all", time_ranges : Array(String) = ["day", "week", "month"]) : Int32
     total_saved = 0
 
@@ -215,86 +203,62 @@ module RedditFetcher
       posts = fetch_subreddit(subreddit, "top", time)
       saved = save_posts_to_db(posts)
       total_saved += saved
-      puts "Saved #{saved} posts from r/#{subreddit} for time range '#{time}'"
-      sleep 1
+      puts "[Reddit] Saved #{saved} posts from r/#{subreddit} for time range '#{time}'"
+      sleep 2.5
     end
 
     total_saved
-  rescue e : Exception
-    puts "Error fetching top by time ranges: #{e.message}"
-    total_saved
   end
 
-  # Search Reddit for posts matching a query
   def self.search(query : String, limit : Int32 = 25) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/search.json?q=#{URI.encode_path(query)}&limit=#{limit}"
-
-    response = HTTP::Client.get(url, headers: HTTP::Headers{"User-Agent" => USER_AGENT})
+    response = HTTP::Client.get(url, headers: generate_browser_headers)
 
     if response.status_code == 200
       parse_reddit_response(response.body)
     else
-      puts "Search failed: #{response.status_code}"
+      puts "[Reddit] Search failed: #{response.status_code}"
       [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
-    puts "Error searching Reddit: #{e.message}"
+    puts "[Reddit] Error searching Reddit: #{e.message}"
     [] of Hash(String, JSON::Any)
   end
 
-  # Fetches posts from a specific user's submissions
   def self.fetch_user_posts(username : String, limit : Int32 = 25) : Array(Hash(String, JSON::Any))
     url = "#{BASE_URL}/user/#{username}/submitted.json?limit=#{limit}"
-
-    response = HTTP::Client.get(url, headers: HTTP::Headers{"User-Agent" => USER_AGENT})
+    response = HTTP::Client.get(url, headers: generate_browser_headers)
 
     if response.status_code == 200
       parse_reddit_response(response.body)
     else
-      puts "Failed to fetch user posts: #{response.status_code}"
+      puts "[Reddit] Failed to fetch user posts: #{response.status_code}"
       [] of Hash(String, JSON::Any)
     end
   rescue e : Exception
-    puts "Error fetching user posts: #{e.message}"
+    puts "[Reddit] Error fetching user posts: #{e.message}"
     [] of Hash(String, JSON::Any)
   end
 
-  # Full fetch routine that combines different strategies
   def self.full_fetch
-    puts "Starting full Reddit fetch..."
+    puts "=== Starting Full Reddit Sync Strategy ==="
 
-    # Fetch hot posts from major subreddits
-    puts "Fetching hot posts..."
+    puts "[Reddit] Fetching Hot posts queue..."
     saved_hot = fetch_multi_subreddits(["all", "popular", "AskReddit", "worldnews", "technology"], "hot")
-    puts "Saved #{saved_hot} hot posts"
+    sleep 3.0
 
-    # Fetch top posts from programming subreddits
-    puts "Fetching top posts from programming subreddits..."
+    puts "[Reddit] Fetching Top posts queue..."
     saved_top = fetch_multi_subreddits(["programming", "webdev", "python", "rust", "golang"], "top")
-    puts "Saved #{saved_top} top posts"
+    sleep 3.0
 
-    # Fetch rising posts for fresh content
-    puts "Fetching rising posts..."
+    puts "[Reddit] Fetching Rising posts queue..."
     saved_rising = fetch_multi_subreddits(["all", "popular"], "rising")
-    puts "Saved #{saved_rising} rising posts"
 
     total = saved_hot + saved_top + saved_rising
-    puts "Reddit fetch complete. Total saved: #{total} posts"
+    puts "=== Reddit fetch execution complete. Total saved: #{total} items ==="
     total
   rescue e : Exception
-    puts "Full fetch failed: #{e.message}"
+    puts "[Reddit] Fatal full fetch iteration break: #{e.message}"
     0
-  end
-
-  # Rotate user agents to avoid rate limiting
-  def self.rotate_user_agent
-    user_agents = [
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15",
-      "CrystalAggregator/1.0 (by /zen/zendrx)",
-    ]
-    user_agents.sample
   end
 end
