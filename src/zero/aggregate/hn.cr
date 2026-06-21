@@ -1,4 +1,5 @@
 # hn.cr - Hacker News content fetcher for Crystal Aggregator
+# Fixed production version focusing strictly on the 3 core elements.
 
 require "http/client"
 require "json"
@@ -19,7 +20,8 @@ module HNFetcher
         
         ids = JSON.parse(body)
         if ids.is_a?(Array)
-          ids.as_a.map(&.as_i64)
+          # Limit the IDs early to avoid fetching hundreds of items unnecessarily
+          ids.as_a.map(&.as_i64).take(limit)
         else
           [] of Int64
         end
@@ -42,31 +44,37 @@ module HNFetcher
       begin
         data = JSON.parse(response.body)
         
-        return nil if data["type"]?.to_s != "story"
+        # Safe extraction of the item type
+        item_type = data["type"]?.try(&.as_s) || ""
+        return nil if item_type != "story"
         
-        title = data["title"]?.to_s || "Untitled"
-        url = data["url"]?.to_s || ""
-        score = data["score"]?.try &.as_i || 0
-        comment_count = data["descendants"]?.try &.as_i || 0
-        external_id = data["id"]?.try &.as_i64.to_s
-        by = data["by"]?.to_s || ""
-        time = data["time"]?.try &.as_i || 0
-        text = data["text"]?.to_s || ""
+        # Core 1, 2, and 3 extracted properly without string pollution
+        title = data["title"]?.try(&.as_s) || "Untitled"
+        story_url = data["url"]?.try(&.as_s) || ""
+        text_content = data["text"]?.try(&.as_s) || ""
         
-        is_self = text.empty? ? false : true
-        content = is_self ? text : ""
+        # Get the real structural ID as a clean string string identifier
+        external_id = data["id"]?.try(&.as_i64.to_s) || data["id"]?.try(&.as_i.to_s) || id.to_s
         
+        # If the story doesn't have an external link, it's a self-post (like "Ask HN")
+        # In that case, use the text body as content, otherwise fallback to standard link behavior
+        content = story_url.empty? ? text_content : ""
+        
+        # If it's a text-only post and has no URL, link back to HN as a fallback
+        if story_url.empty?
+          story_url = "https://news.ycombinator.com/item?id=#{external_id}"
+        end
+
         story = Hash(String, JSON::Any).new
         story["title"] = JSON::Any.new(title)
-        story["url"] = JSON::Any.new(url)
+        story["url"] = JSON::Any.new(story_url)
         story["content"] = JSON::Any.new(content)
         story["source"] = JSON::Any.new("hackernews")
         story["external_id"] = JSON::Any.new(external_id)
-        story["score"] = JSON::Any.new(score)
-        story["comment_count"] = JSON::Any.new(comment_count)
-        story["is_self"] = JSON::Any.new(is_self)
-        story["author"] = JSON::Any.new(by)
-        story["created_utc"] = JSON::Any.new(time)
+        
+        # Padded with zeroes as requested for your platform's native calculation metrics
+        story["score"] = JSON::Any.new(0_i64)
+        story["comment_count"] = JSON::Any.new(0_i64)
         story["is_user_post"] = JSON::Any.new(false)
         
         story
@@ -86,7 +94,7 @@ module HNFetcher
     ids.each do |id|
       story = fetch_story(id)
       stories << story if story
-      sleep 0.1
+      sleep 0.1 # Be polite to the Firebase API
     end
     
     stories
@@ -94,35 +102,45 @@ module HNFetcher
 
   def self.save_stories_to_db(stories : Array(Hash(String, JSON::Any))) : Int32
     saved_count = 0
+    return 0 if stories.empty?
     
     stories.each do |story|
-      external_id = story["external_id"]?.to_s
+      # Safely extract external_id without literal JSON quote artifacts
+      external_id = story["external_id"]?.try(&.as_s) || ""
       next if external_id.empty?
       
-      result = POOL.query(
-        "SELECT id FROM posts WHERE external_id = $1 AND source = 'hackernews'",
-        external_id
-      )
+      # Fixed pool exhaustion leak by utilizing scalar? (closes result sets instantly)
+      exists = POOL.scalar?("SELECT 1 FROM posts WHERE external_id = $1 AND source = 'hackernews'", external_id)
+      if exists
+        next # Already exists, keep moving loop along
+      end
       
-      if !result.move_next
+      begin
+        title = story["title"]?.try(&.as_s) || "Untitled"
+        url = story["url"]?.try(&.as_s) || ""
+        content = story["content"]?.try(&.as_s) || ""
+
         POOL.exec(
-          "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          story["title"]?.to_s || "Untitled",
-          story["url"]?.to_s || "",
-          story["content"]?.to_s || "",
-          story["source"]?.to_s || "hackernews",
-          story["external_id"]?.to_s || "",
-          story["score"]?.try &.as_i || 0,
-          story["comment_count"]?.try &.as_i || 0,
-          false
+          "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+          title,
+          url,
+          content,
+          "hackernews",
+          external_id,
+          0,     # Native Score padded to zero
+          0,     # Native Comment Count padded to zero
+          false  # Native User Post Flag
         )
         saved_count += 1
+      rescue e : PG::Error
+        puts "Database error while inserting story #{external_id}: #{e.message}"
       end
     end
     
     saved_count
-  rescue e : PG::Error
-    puts "Database error while saving stories: #{e.message}"
+  rescue e : Exception
+    puts "Error in save_stories_to_db: #{e.message}"
     0
   end
 
@@ -176,7 +194,6 @@ module HNFetcher
     puts "Saved #{saved} Show HN stories"
     saved
   rescue e : Exception
-    # The exception might have no message, so we handle it gracefully
     puts "Show HN endpoint temporarily unavailable or returned malformed data"
     0
   end
