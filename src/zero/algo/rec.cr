@@ -1,5 +1,3 @@
-# rec.cr - Recommendation engine for Crystal Aggregator
-
 require "json"
 
 module RecommendationEngine
@@ -58,7 +56,7 @@ module RecommendationEngine
   # Hot feed - Reddit-style time decay
   def self.get_hot_feed(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
-      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+      "SELECT id, title, url, source, score, comment_count, created_at
        FROM posts
        WHERE is_user_post = false
        ORDER BY (LOG(GREATEST(score, 1)) + (EXTRACT(EPOCH FROM created_at) / 45000)) DESC
@@ -81,8 +79,6 @@ module RecommendationEngine
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
-      post["upvotes"] = JSON::Any.new(result.read(Int32))
-      post["downvotes"] = JSON::Any.new(result.read(Int32))
       post["feed_type"] = JSON::Any.new("hot")
       posts << post
     end
@@ -92,7 +88,7 @@ module RecommendationEngine
   # New feed - most recent first
   def self.get_new_feed(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
-      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+      "SELECT id, title, url, source, score, comment_count, created_at
        FROM posts
        WHERE is_user_post = false
        ORDER BY created_at DESC
@@ -115,8 +111,6 @@ module RecommendationEngine
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
-      post["upvotes"] = JSON::Any.new(result.read(Int32))
-      post["downvotes"] = JSON::Any.new(result.read(Int32))
       post["feed_type"] = JSON::Any.new("new")
       posts << post
     end
@@ -126,7 +120,7 @@ module RecommendationEngine
   # Top feed - highest scoring posts
   def self.get_top_feed(limit : Int32 = 50, offset : Int32 = 0) : Array(Hash(String, JSON::Any))
     result = POOL.query(
-      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+      "SELECT id, title, url, source, score, comment_count, created_at
        FROM posts
        WHERE is_user_post = false
        ORDER BY score DESC
@@ -149,8 +143,6 @@ module RecommendationEngine
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
-      post["upvotes"] = JSON::Any.new(result.read(Int32))
-      post["downvotes"] = JSON::Any.new(result.read(Int32))
       post["feed_type"] = JSON::Any.new("top")
       posts << post
     end
@@ -163,12 +155,12 @@ module RecommendationEngine
     tag_scores = AlgoDB.get_user_tag_preferences(user_id)
 
     result = POOL.query(
-      "SELECT id, title, url, source, score, comment_count, created_at, upvotes, downvotes
+      "SELECT id, title, url, source, score, comment_count, created_at
        FROM posts
        WHERE is_user_post = false
-         AND id NOT IN (
-           SELECT post_id FROM user_interactions WHERE user_id = $1
-         )
+       AND id NOT IN (
+         SELECT post_id FROM user_interactions WHERE user_id = $1
+       )
        ORDER BY created_at DESC
        LIMIT $2 OFFSET $3",
       user_id, limit * 2, offset
@@ -189,8 +181,6 @@ module RecommendationEngine
       post["score"] = JSON::Any.new(result.read(Int32))
       post["comment_count"] = JSON::Any.new(result.read(Int32))
       post["created_at"] = JSON::Any.new(result.read(Time).to_s)
-      post["upvotes"] = JSON::Any.new(result.read(Int32))
-      post["downvotes"] = JSON::Any.new(result.read(Int32))
 
       score = calculate_personalized_score(post, source_scores, tag_scores)
       scored_posts << {score, post}
