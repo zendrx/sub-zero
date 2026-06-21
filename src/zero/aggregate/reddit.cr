@@ -116,12 +116,10 @@ module RedditFetcher
       external_id = post["external_id"]?.try(&.as_s) || ""
       next if external_id.empty?
 
-      exists = POOL.scalar?("SELECT 1 FROM posts WHERE external_id = $1 AND source = 'reddit'", external_id)
-      if exists
-        next
-      end
-
       begin
+        count = POOL.scalar("SELECT COUNT(*) FROM posts WHERE external_id = $1 AND source = 'reddit'", external_id).as(Int64)
+        next if count > 0
+
         title = post["title"]?.try(&.as_s) || "Untitled"
         url = post["url"]?.try(&.as_s) || ""
         content = post["content"]?.try(&.as_s) || ""
