@@ -1,6 +1,3 @@
-# dev_to.cr - Dev.to content fetcher for Crystal Aggregator
-# Fixed version focusing strictly on the 3 core elements.
-
 require "http/client"
 require "json"
 require "digest/sha256"
@@ -31,7 +28,7 @@ module DevToFetcher
 
     headers = HTTP::Headers{
       "User-Agent" => "CrystalAggregator/1.0",
-      "Accept"     => "application/json"
+      "Accept" => "application/json"
     }
 
     api_key = ENV["DEV_TO"]?
@@ -88,13 +85,11 @@ module DevToFetcher
 
       array_data.each_with_index do |article, idx|
         begin
-          # Core 1, 2, and 3 extracted properly without .to_s string formatting pollution
           title = article["title"]?.try(&.as_s) || ""
           url = article["url"]?.try(&.as_s) || ""
           description = article["description"]?.try(&.as_s) || ""
           published_at = article["published_at"]?.try(&.as_s) || ""
-          
-          # Using Dev.to's actual unique API ID for external_id to avoid matching collissions
+
           devto_id = article["id"]?.try(&.as_i64.to_s) || article["id"]?.try(&.as_i.to_s) || ""
 
           if title.empty? || url.empty?
@@ -114,15 +109,14 @@ module DevToFetcher
           article_data["published_at"] = JSON::Any.new(published_at)
           article_data["external_id"] = JSON::Any.new(external_id)
           article_data["source"] = JSON::Any.new("devto")
-          
-          # Padded with zeroes as requested for your platform's native calculation metrics
+
           article_data["score"] = JSON::Any.new(0_i64)
           article_data["comment_count"] = JSON::Any.new(0_i64)
           article_data["is_user_post"] = JSON::Any.new(false)
 
           articles << article_data
           if idx < 3
-            puts "[Dev.to]   #{idx+1}. #{title[0..40]}... (id: #{external_id})"
+            puts "[Dev.to] #{idx+1}. #{title[0..40]}... (id: #{external_id})"
           end
         rescue e : Exception
           puts "[Dev.to] Error parsing article #{idx}: #{e.message}"
@@ -144,38 +138,35 @@ module DevToFetcher
     puts "[Dev.to] Saving #{articles.size} articles to database..."
     articles.each_with_index do |article, idx|
       external_id = article["external_id"]?.try(&.as_s) || ""
-      
+
       if external_id.empty?
         puts "[Dev.to] Article #{idx} missing external_id, skipping."
         next
       end
 
-      # Fixed pool exhaustion leak by safely utilizing scalar? (closes result sets instantly)
-      exists = POOL.scalar?("SELECT 1 FROM posts WHERE external_id = $1 AND source = 'devto'", external_id)
-      if exists
-        next
-      end
-
       begin
+        count = POOL.scalar("SELECT COUNT(*) FROM posts WHERE external_id = $1 AND source = 'devto'", external_id).as(Int64)
+        next if count > 0
+
         title = article["title"]?.try(&.as_s) || "Untitled"
         url = article["url"]?.try(&.as_s) || ""
         content = article["content"]?.try(&.as_s) || ""
 
         POOL.exec(
-          "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+          "INSERT INTO posts (title, url, content, source, external_id, score, comment_count, is_user_post)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
           title,
           url,
           content,
           "devto",
           external_id,
-          0,     # Native Score
-          0,     # Native Comment Count
-          false  # Native User Post Flag
+          0,
+          0,
+          false
         )
         saved_count += 1
         if saved_count <= 3
-          puts "[Dev.to]   Saved: #{title[0..40]}..."
+          puts "[Dev.to] Saved: #{title[0..40]}..."
         end
       rescue e : PG::Error
         puts "[Dev.to] DB error for #{external_id}: #{e.message}"
@@ -198,11 +189,11 @@ module DevToFetcher
 
   def self.fetch_top_articles(limit : Int32 = DEFAULT_LIMIT, time_range : String = "week") : Int32
     days = case time_range
-           when "week" then 7
-           when "month" then 30
-           when "year" then 365
-           else 7
-           end
+    when "week" then 7
+    when "month" then 30
+    when "year" then 365
+    else 7
+    end
     puts "[Dev.to] Fetching top #{time_range} (top=#{days}, limit #{limit})..."
     params = { "per_page" => limit, "top" => days }
     articles = fetch_articles(params)
