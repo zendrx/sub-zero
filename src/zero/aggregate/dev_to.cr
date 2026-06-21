@@ -88,7 +88,16 @@ module DevToFetcher
             description = article["description"]?.try &.as_s || ""
             cover_image = article["cover_image"]?.try &.as_s || ""
             published_at = article["published_at"]?.try &.as_s || ""
-            tag_list = article["tag_list"]?.try &.as_s || ""
+            
+            tag_list_value = article["tag_list"]?
+            tag_list = case tag_list_value
+                       when String
+                         tag_list_value
+                       when Array
+                         tag_list_value.join(", ")
+                       else
+                         ""
+                       end
 
             positive_reactions_count = 0
             if reactions = article["positive_reactions_count"]?
@@ -98,7 +107,17 @@ module DevToFetcher
             end
 
             comments_count = article["comments_count"]?.try &.as_i || 0
-            external_id = article["id"]?.try &.as_i64.to_s
+            
+            external_id = article["id"]?
+            external_id_str = case external_id
+                             when Int64
+                               external_id.to_s
+                             when String
+                               external_id
+                             else
+                               ""
+                             end
+            
             reading_time_minutes = article["reading_time_minutes"]?.try &.as_i || 0
 
             user = article["user"]?
@@ -109,7 +128,7 @@ module DevToFetcher
             org_name = organisation ? organisation["name"]?.try &.as_s || "" : ""
 
             content = description
-            tags = tag_list.is_a?(Array) ? tag_list.as_a.join(", ") : tag_list
+            tags = tag_list
 
             article_data = Hash(String, JSON::Any).new
             article_data["title"] = JSON::Any.new(title)
@@ -117,7 +136,7 @@ module DevToFetcher
             article_data["content"] = JSON::Any.new(content)
             article_data["cover_image"] = JSON::Any.new(cover_image)
             article_data["source"] = JSON::Any.new("devto")
-            article_data["external_id"] = JSON::Any.new(external_id || "")
+            article_data["external_id"] = JSON::Any.new(external_id_str)
             article_data["score"] = JSON::Any.new(positive_reactions_count)
             article_data["comment_count"] = JSON::Any.new(comments_count)
             article_data["is_user_post"] = JSON::Any.new(false)
@@ -131,7 +150,7 @@ module DevToFetcher
             articles << article_data
 
             if index < 3
-              puts "  Article #{index+1}: #{title[0..30]}... (ID: #{external_id || "NONE"})"
+              puts "  Article #{index+1}: #{title[0..30]}... (ID: #{external_id_str || "NONE"})"
             end
           rescue e : Exception
             puts "Error parsing article #{index}: #{e.message}"
