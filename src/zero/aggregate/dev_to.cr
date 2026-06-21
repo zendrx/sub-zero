@@ -76,7 +76,6 @@ module DevToFetcher
       data = JSON.parse(body)
       articles = [] of Hash(String, JSON::Any)
 
-      # Use typeof or .class instead of .class_name
       puts "Dev.to response type: #{typeof(data)}"
 
       if data.is_a?(Array(JSON::Any))
@@ -268,15 +267,16 @@ module DevToFetcher
   def self.fetch_articles_by_tags(tags : Array(String), limit_per_tag : Int32 = DEFAULT_LIMIT) : Int32
     total_saved = 0
 
-    tags.each do |tag|
-      saved = fetch_articles_by_tag(tag, limit_per_tag)
-      total_saved += saved
-      puts "Fetched #{saved} articles for tag #{tag}"
+    begin
+      tags.each do |tag|
+        saved = fetch_articles_by_tag(tag, limit_per_tag)
+        total_saved += saved
+        puts "Fetched #{saved} articles for tag #{tag}"
+      end
+    rescue e : Exception
+      puts "Error fetching articles by tags: #{e.message}"
     end
 
-    total_saved
-  rescue e : Exception
-    puts "Error fetching articles by tags: #{e.message}"
     total_saved
   end
 
